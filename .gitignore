@@ -1,0 +1,60 @@
+# Compiled OCaml files
+*.cmo
+*.cmi
+*.cmx
+*.cma
+*.cmxa
+*.o
+*.a
+*.opt
+
+# Build directories
+build/
+build_bytecode/
+build_native/
+_build/
+
+# Executables
+*.byte
+*.native
+*.exe
+computational-category-exercises
+
+# Documentation (generated)
+doc/
+*.html
+
+# OCamlfind package repository
+.opam/
+
+# Emacs backup files
+*~
+.#*
+
+# Mac OS generated files
+.DS_Store
+
+# Windows generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# OCaml compiler output
+bytecode-compiled-files/
+native-compiled-files/
+
+# IDE-specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test coverage reports
+coverage/
+*.gcno
+*.gcda
+
+# Architecture planning cache
+.agents/cache/
+.agents/plan/.cache/
