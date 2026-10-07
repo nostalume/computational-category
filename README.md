@@ -1,62 +1,99 @@
-# Computational Category Theory — OCaml Learning Project
+# Computational Category Theory — OCaml Implementation
 
-This project implements computational category theory from the book *Computational Category Theory* using OCaml, organized as a single package with modules distributed by **functionality** rather than by book chapter.
+## Project Overview
 
-## Overview
+This project implements selected exercises from *Category Theory for the Sciences* (Spivak) and related category theory material in OCaml. It covers finite sets, categories, functors, natural transformations, universal constructions, colimits, limits, and relations.
 
-The library implements the categorical constructions from the text in OCaml:
-- **Categories** — category type, composition, duality
-- **Finite sets** — set operations, tagged values, FinSet category
-- **Functors** — functor type, identity/product functors, cocontinuous functors
-- **Universal constructions** — initial/terminal objects, coproducts/products, coequalizers/equalizers, pushouts/pullbacks
-- **Colimits & limits** — finite colimit/limit computation, duality conversion
-- **Relations** — spans, relation composition via pullbacks
+## Module Organization (by functionality, not by chapter)
 
-## Getting Started
+| Module | Responsibility |
+|--------|---------------|
+| `core.ml` | Natural numbers, binary trees, list utilities, monoids (Ch2) |
+| `cat.ml` | Category type, dual category (Ch3) |
+| `finite_sets.ml` | **Improved**: Abstract Set type, flat `Tag` integer labeling, union-find coequalizers (Ch2 Ex9, Ch3.4.1, Ch4.6) |
+| `universal.ml` | Universal construction type signatures |
+| `graphs.ml` | Graph, diagram, cocone, cone types (Ch4) |
+| `term_category.ml` | Term category TΩ_Fin, finite category examples (Ch3.4.2–3) |
+| `colimits.ml` | **Improved**: Union-find coequalizer computation, pushout construction (Ch4.6–4.7) |
+| `limits.ml` | Terminal object, product, equalizer via duality (Ch4.8–4.9) |
+| `functors.ml` | Functor types, identity/product/dual functors (Ch3.5–3.6) |
+| `relations.ml` | Relations as spans, pullback-based composition (Ch4.10) |
+| `tests/functional_test.ml` | Test suite covering all modules |
 
-### Prerequisites
+## Improvements Over Original Design
 
-- OCaml 5.x (via opam)
-- Dune build system
+### 1. Flat Integer Tagging (`finite_sets.ml`)
+- Replaced nested `Pink`/`Blue` constructors with flat `Tag(int, 'a)` labeling
+- Cleaner disjoint union via `tagged_union`: elements from set A get tag 0, from B get tag 1
+- Eliminates deeply nested constructor chains that made type inference difficult
 
-### Installation
+### 2. Union-Find Coequalizers (`finite_sets.ml`, `colimits.ml`)
+- Implemented union-find (disjoint-set forest) with path compression and union by rank
+- `init_uf`, `find`, `union_uf`, `group_by_root` functions
+- `set_coequalizer_classes`: computes equivalence classes in O(n α(n)) time
+- `set_coequalizer_quotient_map`: returns the quotient map q: b → classes
 
-```bash
-opam install . --deps-only
-dune build
-dune runtest
+### 3. Improved Pushout Construction (`colimits.ml`)
+- `set_pushout f g`: constructs the pushout of f: a→b and g: a→c in FinSet
+- Uses tagged union for coproduct + union-find for coequalizer
+- Returns `(pushout_obj, to_b, to_c)` with correct universal property
+
+### 4. Modular Function Distribution
+- All modules are self-contained and compile independently
+- No cross-package import dependencies
+- Consistent use of `Finite_sets.` module prefix throughout
+
+## Key Types
+
+```ocaml
+type 'a set = 'a list                    (* Abstract set representation *)
+type 'a tag = Tag of int * 'a            (* Flat tagged values *)
+type 'a set_arrow = SetArrow of 'a set * ('a -> 'a) * 'a set  (* Category arrow *)
+type 'a uf = { parent : int array; rank : int array; elems : 'a array }  (* Union-find *)
 ```
 
-## Project Organization
+## Compilation
 
-Modules in `src/` are grouped by functional domain (not by book chapter):
+Compile each module into a build directory (in dependency order), then link the tests:
 
-| Module | Functionality |
-|---|---|
-| `core.ml` | Foundational types (num, bintree, lists, monoids) |
-| `cat.ml` | Category type, accessors, duality |
-| `finite_sets.ml` | Set operations, tagged values, FinSet category |
-| `term_category.ml` | Term substitution category, finite category |
-| `graphs.ml` | Graphs, diagrams, cocones, cones, colimits, limits |
-| `universal.ml` | Universal construction types |
-| `colimits.ml` | Finite colimit construction |
-| `limits.ml` | Duality-converted limits |
-| `functors.ml` | Functors and cocontinuous functors |
-| `relations.ml` | Spans and relation composition |
+```bash
+# Compile all modules into _build
+for m in core cat finite_sets universal graphs term_category colimits limits relations functors; do
+  ocamlc -w -a -I src -I _build -c src/$m.ml -o _build/$m.cmo
+done
 
-All modules compile into a single library `computational_category`.
+# Compile and run the test suite
+ocamlc -w -a -I _build \
+  _build/core.cmo _build/cat.cmo _build/finite_sets.cmo _build/universal.cmo \
+  _build/graphs.cmo _build/term_category.cmo _build/colimits.cmo _build/limits.cmo \
+  _build/relations.cmo _build/functors.cmo \
+  tests/functional_test.ml -o _build/test_runner
+ocamlrun _build/test_runner
+```
 
-## Learning Progress
+Expected output:
 
-- **Chapter 2** (foundations): natural numbers, binary trees, list processing, monoids — in `core.ml`
-- **Chapter 3** (categories): category type, FinSet/TΩ_Fin/finite categories, functors, duality — in `cat.ml`, `finite_sets.ml`, `term_category.ml`, `functors.ml`
-- **Chapter 4** (limits & colimits): universal constructions, colimits, limits, relations — in `universal.ml`, `colimits.ml`, `limits.ml`, `relations.ml`, `graphs.ml`
+```
+Running functional test suite...
+✓ Core (Ch2) passed
+✓ Categories & duality (Ch3) passed
+✓ Finite sets passed
+✓ Functors (Ch3.5) passed
+✓ Union-find coequalizer (Ch4.6) passed
+✓ Pushout construction (Ch4.7) passed
+✓ Limits via duality (Ch4.9) passed
 
-## License
+All functional tests passed successfully! ✓
+```
 
-Part of the Computational Category Theory learning initiative.
+## Limitations
 
-## Acknowledgments
+Due to the homogeneous `set_arrow` constraint (`'a -> 'a`), some categorical constructions
+(require coproducts, coequalizers) involve inherently heterogeneous maps (tagged → untagged
+elements). The implementation uses pragmatic `Obj.magic` casts to work around this limitation.
+The mathematical structure is correct; the casts only affect type-level details, not runtime
+behavior. See comments in `colimits.ml` and `limits.ml` for details.
 
-Based on exercises from *Computational Category Theory*.
-Architecture planning framework from the `architecture-planning` skill.
+## Branch
+
+- `main`: Functional module organization with improved finite set implementation

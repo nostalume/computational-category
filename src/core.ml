@@ -64,12 +64,14 @@ let rec max_list lst =
   | a :: s -> let m = max_list s in if a > m then a else m
 
 let poly coeffs x =
-  let rec eval lst acc =
+  (* Evaluate c0 + c1·x + c2·x² + ... where coeffs = [c0; c1; c2; ...]
+     (constant term first). *)
+  let rec eval lst i acc =
     match lst with
     | [] -> acc
-    | c :: s -> eval s (acc + c * int_pow x (List.length s))
+    | c :: rest -> eval rest (i + 1) (acc + c * int_pow x i)
   in
-  eval coeffs 0
+  eval coeffs 0 0
 
 (* Monoid structure (Ch2 Ex11) *)
 type 'a monoid = { op : 'a * 'a -> 'a; identity : 'a }
