@@ -1,4 +1,5 @@
-(* Test suite for the Computational Category Theory library *)
+(* Test suite for the Computational Category Theory library.
+   Updated for the record-based layered refactor. *)
 
 open Core
 open Cat
@@ -29,19 +30,30 @@ let test_core () =
    Test: Category type and duality (Ch3)
    ============================================================================ *)
 let test_cat () =
-  let (Cat (s, t, i, c)) = finset_cat in
+  let c = finset_cat in
   let a = [1;2] in
   let b = [3;4] in
-  let f = SetArrow (a, (fun x -> x + 2), b) in
+  let f = { sa_src = a; sa_fn = (fun x -> x + 2); sa_tgt = b } in
   assert (set_s f = a);
   assert (set_t f = b);
   assert (set_arrow_apply f 1 = 3);
-  let (Cat (s', t', i', c')) = dual_cat finset_cat in
-  assert (s' f = b);
-  assert (t' f = a);
-  let (Cat (fs, ft, fi, fc)) = FiniteCategory.cat in
-  assert (fs FiniteCategory.F = FiniteCategory.B);
-  assert (ft FiniteCategory.F = FiniteCategory.A);
+  let c' = dual_cat c in
+  assert (c'.source f = b);
+  assert (c'.target f = a);
+  let fc = FiniteCategory.cat in
+  assert (fc.source FiniteCategory.F = FiniteCategory.B);
+  assert (fc.target FiniteCategory.F = FiniteCategory.A);
+  (* result-based composition *)
+  let g = { sa_src = b; sa_fn = (fun x -> x * 10); sa_tgt = [10;20;30;40] } in
+  (match compose_result c g f with
+   | Ok h ->
+     assert (set_s h = a);
+     assert (set_t h = [10;20;30;40]);
+     assert (set_arrow_apply h 1 = 30)  (* (1+2)*10 = 30 *)
+   | Error _ -> assert false);
+  (* non-composable pair must return Error, not raise *)
+  let bad_g = { sa_src = [9]; sa_fn = (fun x -> x); sa_tgt = [9] } in
+  assert (match compose_result c bad_g f with Ok _ -> false | Error _ -> true);
   Printf.printf "✓ Categories & duality (Ch3) passed\n"
 
 (* ============================================================================
@@ -61,11 +73,11 @@ let test_finite_sets () =
    Test: Functors (Ch3.5)
    ============================================================================ *)
 let test_functors () =
-  let (FFunctor (src, fo, fa, tgt)) = id_functor finset_cat in
+  let ff = id_functor finset_cat in
   let a = [1;2;3] in
-  assert (fo a = a);
-  let (FFunctor (_, xo, xa, _)) = product_functor in
-  let pa = xo [1;2] in
+  assert (ff.f_omap a = a);
+  let pf = product_functor in
+  let pa = pf.f_omap [1;2] in
   assert (List.length pa = 4);
   Printf.printf "✓ Functors (Ch3.5) passed\n"
 
@@ -74,8 +86,8 @@ let test_functors () =
    ============================================================================ *)
 let test_coequalizer_uf () =
   let a = ['a'; 'b'] in
-  let f = SetArrow (a, (fun x -> x), a) in
-  let g = SetArrow (a, (fun x -> if x = 'a' then 'b' else 'a'), a) in
+  let f = { sa_src = a; sa_fn = (fun x -> x); sa_tgt = a } in
+  let g = { sa_src = a; sa_fn = (fun x -> if x = 'a' then 'b' else 'a'); sa_tgt = a } in
   let classes = set_coequalizer_classes f g in
   assert (List.length classes = 1);
   let cls = List.hd classes in
@@ -90,14 +102,12 @@ let test_pushout () =
      B = {x}, C = {x;y}, identified along the common {x}.
      The pushout has classes {x} and {y}: 2 elements. *)
   let open Finite_sets in
-  (* Source a = {x} (single element), b = {x}, c = {x; y} *)
   let a = ['x'] in
   let b = ['x'] in
   let c = ['x'; 'y'] in
-  let f = SetArrow (a, (fun x -> x), b) in
-  let g = SetArrow (a, (fun x -> x), c) in
+  let f = { sa_src = a; sa_fn = (fun x -> x); sa_tgt = b } in
+  let g = { sa_src = a; sa_fn = (fun x -> x); sa_tgt = c } in
   let (pushout_obj, to_b, to_c) = Colimits.set_pushout f g in
-  (* The pushout should have 2 classes: {x} (merged) and {y} *)
   assert (List.length pushout_obj = 2);
   Printf.printf "✓ Pushout construction (Ch4.7) passed\n"
 
@@ -105,14 +115,14 @@ let test_pushout () =
    Test: Limits via duality (Ch4.9)
    ============================================================================ *)
 let test_limits () =
-  let (tobj, _) = set_terminal in
-  assert (tobj = [()]);
-  let ((prod, p1, p2), _) = set_product ([1;2], [3;4]) in
-  assert (List.length prod = 4);
-  let f = SetArrow ([1;2;3], (fun x -> x), [1;2;3]) in
-  let g = SetArrow ([1;2;3], (fun x -> 1), [1;2;3]) in
-  let ((eobj, _), _) = set_equalizer (f, g) in
-  assert (eobj = [1]);
+  let tobj = set_terminal in
+  assert (tobj.term_obj = [()]);
+  let ((data, _)) = set_product ([1;2], [3;4]) in
+  assert (List.length data.prod_obj = 4);
+  let f = { sa_src = [1;2;3]; sa_fn = (fun x -> x); sa_tgt = [1;2;3] } in
+  let g = { sa_src = [1;2;3]; sa_fn = (fun x -> 1); sa_tgt = [1;2;3] } in
+  let (edata, _) = set_equalizer f g in
+  assert (edata.eq_obj = [1]);
   Printf.printf "✓ Limits via duality (Ch4.9) passed\n"
 
 (* ============================================================================

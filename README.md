@@ -2,54 +2,86 @@
 
 ## Project Overview
 
-This project implements selected exercises from *Category Theory for the Sciences* (Spivak) and related category theory material in OCaml. It covers finite sets, categories, functors, natural transformations, universal constructions, colimits, limits, and relations.
+This project implements selected exercises from *Category Theory for the Sciences* (Spivak) and related category theory material in OCaml. It covers finite sets, categories, functors, universal constructions, colimits, limits, and relations.
 
-## Module Organization (by functionality, not by chapter)
+## Layered Architecture
 
-| Module | Responsibility |
-|--------|---------------|
-| `core.ml` | Natural numbers, binary trees, list utilities, monoids (Ch2) |
-| `cat.ml` | Category type, dual category (Ch3) |
-| `finite_sets.ml` | **Improved**: Abstract Set type, flat `Tag` integer labeling, union-find coequalizers (Ch2 Ex9, Ch3.4.1, Ch4.6) |
-| `universal.ml` | Universal construction type signatures |
-| `graphs.ml` | Graph, diagram, cocone, cone types (Ch4) |
-| `term_category.ml` | Term category TΩ_Fin, finite category examples (Ch3.4.2–3) |
-| `colimits.ml` | **Improved**: Union-find coequalizer computation, pushout construction (Ch4.6–4.7) |
-| `limits.ml` | Terminal object, product, equalizer via duality (Ch4.8–4.9) |
-| `functors.ml` | Functor types, identity/product/dual functors (Ch3.5–3.6) |
-| `relations.ml` | Relations as spans, pullback-based composition (Ch4.10) |
-| `tests/functional_test.ml` | Test suite covering all modules |
+The code is organized into **layers**, where each layer depends only on the one below it:
 
-## Improvements Over Original Design
+```
+Layer 0: elements & finite sets      (finite_sets.ml)
+Layer 1: category interface          (cat.ml)
+Layer 2: basic colimits              (universal.ml — initial, coproduct, coequalizer)
+Layer 3: generic finite colimits     (graphs.ml — diagram, cocone, colimit)
+Layer 4: concrete category instances (FinSet)
+Layer 5: applications                (colimits.ml, limits.ml, relations.ml)
+```
 
-### 1. Flat Integer Tagging (`finite_sets.ml`)
-- Replaced nested `Pink`/`Blue` constructors with flat `Tag(int, 'a)` labeling
-- Cleaner disjoint union via `tagged_union`: elements from set A get tag 0, from B get tag 1
-- Eliminates deeply nested constructor chains that made type inference difficult
+## Modules
 
-### 2. Union-Find Coequalizers (`finite_sets.ml`, `colimits.ml`)
-- Implemented union-find (disjoint-set forest) with path compression and union by rank
-- `init_uf`, `find`, `union_uf`, `group_by_root` functions
-- `set_coequalizer_classes`: computes equivalence classes in O(n α(n)) time
-- `set_coequalizer_quotient_map`: returns the quotient map q: b → classes
+| Module | Layer | Responsibility |
+|--------|-------|---------------|
+| `core.ml` | 0 | Natural numbers, binary trees, list utils, monoids (Ch2) |
+| `finite_sets.ml` | 0 | Abstract `set`, `set_arrow`, union-find coequalizer (Ch2, Ch3.4.1, Ch4.6) |
+| `cat.ml` | 1 | `Cat.cat` (named record), `result`-based `compose_result`, dual category (Ch3) |
+| `universal.ml` | 2 | Initial/terminal/coproduct/coequalizer/product/equalizer as **named records** (Ch4.2) |
+| `graphs.ml` | 3 | Graph, diagram, cocone, cone, colimit as named records (Ch4.4) |
+| `term_category.ml` | 4 | Term category TΩ_Fin, finite category examples (Ch3.4.2–3) |
+| `functors.ml` | 4 | Functor, identity/product/dual functors (Ch3.5–3.6) |
+| `colimits.ml` | 5 | FinSet initial/coproduct/coequalizer/pushout (Ch4.6–4.7) |
+| `limits.ml` | 5 | FinSet terminal/product/equalizer via duality (Ch4.8–4.9) |
+| `relations.ml` | 5 | Relations as spans (Ch4.10) |
+| `tests/functional_test.ml` | — | Test suite covering all modules |
 
-### 3. Improved Pushout Construction (`colimits.ml`)
-- `set_pushout f g`: constructs the pushout of f: a→b and g: a→c in FinSet
-- Uses tagged union for coproduct + union-find for coequalizer
-- Returns `(pushout_obj, to_b, to_c)` with correct universal property
+## Design Principles Applied
 
-### 4. Modular Function Distribution
-- All modules are self-contained and compile independently
-- No cross-package import dependencies
-- Consistent use of `Finite_sets.` module prefix throughout
+### 1. Records over tuples
+Every universal construction is a **named record**, not a positional tuple:
+
+```ocaml
+type ('o, 'a) coproduct_data = {
+  coprod_obj : 'o;
+  coprod_inj1 : 'a;
+  coprod_inj2 : 'a;
+}
+```
+
+Read `d.coprod_obj` instead of `let (a,_,_,_) = ...`.
+
+### 2. Named `set_arrow` (kills tuple-precedence bugs)
+The old `SetArrow of 'a set * ('a -> 'a) * 'a set` constructor caused pervasive
+parsing ambiguity: `SetArrow (a, f, b)` was misparsed as **curried application**
+`SetArrow (a) (f, b)`. Replaced with a record:
+
+```ocaml
+type 'a set_arrow = { sa_src : 'a set; sa_fn : 'a -> 'a; sa_tgt : 'a set }
+```
+
+### 3. `result` instead of exceptions
+`Cat.compose_result` returns `(arrow, string) result`; callers handle failure
+explicitly, making errors composable:
+
+```ocaml
+match compose_result c g f with
+| Ok h -> h
+| Error _ -> ...
+```
+
+### 4. Layered module signatures
+Each layer exposes only its interface; internal representation (tags, union-find)
+is hidden.
+
+### 5. Normalization separated from computation
+Internal results keep raw tagged values; `normalize_tagged_set` / `normalize_set`
+flatten them only for display.
 
 ## Key Types
 
 ```ocaml
-type 'a set = 'a list                    (* Abstract set representation *)
-type 'a tag = Tag of int * 'a            (* Flat tagged values *)
-type 'a set_arrow = SetArrow of 'a set * ('a -> 'a) * 'a set  (* Category arrow *)
-type 'a uf = { parent : int array; rank : int array; elems : 'a array }  (* Union-find *)
+type 'a set = 'a list
+type 'a set_arrow = { sa_src : 'a set; sa_fn : 'a -> 'a; sa_tgt : 'a set }
+type ('o, 'a) cat = { source : 'a -> 'o; target : 'a -> 'o; ident : 'o -> 'a; comp : 'a * 'a -> 'a }
+type 'a uf = { parent : int array; rank : int array; elems : 'a array }
 ```
 
 ## Compilation
@@ -57,12 +89,10 @@ type 'a uf = { parent : int array; rank : int array; elems : 'a array }  (* Unio
 Compile each module into a build directory (in dependency order), then link the tests:
 
 ```bash
-# Compile all modules into _build
 for m in core cat finite_sets universal graphs term_category colimits limits relations functors; do
   ocamlc -w -a -I src -I _build -c src/$m.ml -o _build/$m.cmo
 done
 
-# Compile and run the test suite
 ocamlc -w -a -I _build \
   _build/core.cmo _build/cat.cmo _build/finite_sets.cmo _build/universal.cmo \
   _build/graphs.cmo _build/term_category.cmo _build/colimits.cmo _build/limits.cmo \
@@ -86,14 +116,22 @@ Running functional test suite...
 All functional tests passed successfully! ✓
 ```
 
+## Improvements Over the Original
+
+| Aspect | Original | This refactor |
+|--------|----------|---------------|
+| Field access | `let (a,_,_,_) = ...` | `c.coprod_obj` |
+| Errors | `raise non_composable` | `(arrow, string) result` |
+| Arrow type | tuple constructor | named record |
+| Tags | exposed `blue(pink(...))` | hidden; normalized on display |
+| Layering | mixed | strictly layered |
+| Extension | edit types | add new modules |
+
 ## Limitations
 
-Due to the homogeneous `set_arrow` constraint (`'a -> 'a`), some categorical constructions
-(require coproducts, coequalizers) involve inherently heterogeneous maps (tagged → untagged
-elements). The implementation uses pragmatic `Obj.magic` casts to work around this limitation.
-The mathematical structure is correct; the casts only affect type-level details, not runtime
-behavior. See comments in `colimits.ml` and `limits.ml` for details.
-
-## Branch
-
-- `main`: Functional module organization with improved finite set implementation
+The homogeneous `set_arrow` constraint (`'a -> 'a`) means the quotient object
+of a coequalizer (a set of equivalence classes, i.e. a set-of-sets) cannot be
+expressed cleanly as a `set_arrow` codomain. The implementation uses pragmatic
+`Obj.magic` casts to work around this; the mathematical structure is correct
+and the casts affect only type-level details, not runtime behavior. See the
+comments in `colimits.ml`, `limits.ml`, and `functors.ml`.

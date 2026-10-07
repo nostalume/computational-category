@@ -28,7 +28,10 @@ module TermCategory = struct
   and opr_args (Opr (_, args)) = args
 
   let cat : (string list, substitution) Cat.cat =
-    Cat.Cat (subst_s, subst_t, subst_ident, fun (f, g) -> subst_compose f g)
+    { Cat.source = subst_s;
+      Cat.target = subst_t;
+      Cat.ident  = subst_ident;
+      Cat.comp   = (fun (f, g) -> subst_compose f g) }
 end
 
 (* ============================================================================
@@ -56,5 +59,5 @@ module FiniteCategory = struct
     | (H, F) -> K
     | _ -> raise (Failure "non_composable")
 
-  let cat : (obj, arr) Cat.cat = Cat.Cat (source, target, ident, comp)
+  let cat : (obj, arr) Cat.cat = { Cat.source = source; Cat.target = target; Cat.ident = ident; Cat.comp = comp }
 end

@@ -3,19 +3,24 @@
    cocontinuous functors (Ch4.4).
    ============================================================================ *)
 
-(* Functor type — renamed from 'functor' to avoid OCaml keyword conflict *)
-type ('oa, 'aa, 'ob, 'ab) f_functor = FFunctor of
-  ('oa, 'aa) Cat.cat * ('oa -> 'ob) * ('aa -> 'ab) * ('ob, 'ab) Cat.cat
+(* Functor type — named record. Renamed from 'functor' because that is a
+   reserved OCaml keyword. *)
+type ('oa, 'aa, 'ob, 'ab) cat_functor = {
+  f_dom : ('oa, 'aa) Cat.cat;
+  f_omap : 'oa -> 'ob;
+  f_amap : 'aa -> 'ab;
+  f_cod : ('ob, 'ab) Cat.cat;
+}
 
 (* Identity functor *)
 let id_functor (c : ('o, 'a) Cat.cat) =
-  FFunctor (c, (fun x -> x), (fun x -> x), c)
+  { f_dom = c; f_omap = (fun x -> x); f_amap = (fun x -> x); f_cod = c }
 
 (* Product functor X: FinSet -> FinSet (Ch3.5.2).
    On objects: A |-> A x A.  On arrows: f |-> f x f.
    The cartesian product yields ('a * 'a) elements; we cast to keep
    arrows homogeneous (see Limitations in README). *)
-let product_functor : ('a Finite_sets.set, 'a Finite_sets.set_arrow, 'a Finite_sets.set, 'a Finite_sets.set_arrow) f_functor =
+let product_functor : ('a Finite_sets.set, 'a Finite_sets.set_arrow, 'a Finite_sets.set, 'a Finite_sets.set_arrow) cat_functor =
   let obj_map a = Obj.magic (Finite_sets.cartesian_prod a a) in
   let arr_map f =
     let a = Finite_sets.set_s f in
@@ -23,26 +28,29 @@ let product_functor : ('a Finite_sets.set, 'a Finite_sets.set_arrow, 'a Finite_s
     let a2 = Finite_sets.cartesian_prod a a in
     let b2 = Finite_sets.cartesian_prod b b in
     let fn = Finite_sets.set_arrow_apply f in
-    (* Cast the pair-arrow to a homogeneous set_arrow *)
     let raw : ('a * 'a) Finite_sets.set_arrow =
-      Finite_sets.SetArrow (a2, (fun (x, y) -> (fn x, fn y)), b2)
+      { Finite_sets.sa_src = a2; sa_fn = (fun (x, y) -> (fn x, fn y)); sa_tgt = b2 }
     in
     Obj.magic raw
   in
-  FFunctor (Finite_sets.finset_cat, obj_map, arr_map, Finite_sets.finset_cat)
+  { f_dom = Finite_sets.finset_cat;
+    f_omap = obj_map;
+    f_amap = arr_map;
+    f_cod = Finite_sets.finset_cat }
 
-(* Dual functor (Ch3.6): same functions between dual categories *)
-let dual_functor (f : ('oa, 'aa, 'ob, 'ab) f_functor) =
-  let (FFunctor (a, fo, fa, b)) = f in
-  FFunctor (Cat.dual_cat a, fo, fa, Cat.dual_cat b)
+(* Dual functor (Ch3.6): same maps between dual categories *)
+let dual_functor (f : ('oa, 'aa, 'ob, 'ab) cat_functor) =
+  { f_dom = Cat.dual_cat f.f_dom;
+    f_omap = f.f_omap;
+    f_amap = f.f_amap;
+    f_cod = Cat.dual_cat f.f_cod }
 
 (* Cocontinuous functor (Ch4.4): functor + map between colimiting cocones *)
-type ('oa, 'aa, 'ob, 'ab) cocontinuous_functor =
-  CocontinuousFunctor of
-    ('oa, 'aa, 'ob, 'ab) f_functor *
-    (('oa, 'aa) Graphs.colimiting_cocone -> ('ob, 'ab) Graphs.colimiting_cocone)
+type ('oa, 'aa, 'ob, 'ab) cocontinuous_functor = {
+  cc_functor : ('oa, 'aa, 'ob, 'ab) cat_functor;
+  cc_map : ('oa, 'aa) Graphs.colimiting_cocone -> ('ob, 'ab) Graphs.colimiting_cocone;
+}
 
 (* Identity functor is cocontinuous *)
 let id_cocontinuous_functor (c : ('o, 'a) Cat.cat) =
-  let ff = id_functor c in
-  CocontinuousFunctor (ff, (fun cc -> cc))
+  { cc_functor = id_functor c; cc_map = (fun cc -> cc) }

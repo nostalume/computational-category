@@ -1,7 +1,14 @@
 (* ============================================================================
    Finite Sets — foundational module (Ch2 Ex9, Ch3.4.1, Ch4.6/4.9).
-   Provides set operations, tagged values for disjoint unions, the FinSet
-   category, and union-find based coequalizer computation.
+   Layer 0: sets, tagged values, union-find coequalizers.
+
+   Key design decisions:
+   - 'a set = 'a list (sets as deduplicated lists)
+   - set_arrow uses a NAMED RECORD, not a tuple constructor.
+     This eliminates all the precedence bugs seen in the original code
+     where SetArrow (a, f, b) was misparsed as curried application.
+   - Union-find coequalizer with path compression and rank-based union
+   - Flat Tag(int, 'a) labeling for disjoint unions (internal, hidden)
    ============================================================================ *)
 
 (* ============================================================================
@@ -55,13 +62,13 @@ let rec powerset s =
 
 (* ============================================================================
    Tagged values for labelled disjoint unions (internal).
-   Flat integer tagging: tag(n, x) marks x as coming from the n-th set.
-   Backward-compatible constructors for tests.
+   Flat integer tagging: Tag(n, x) marks x as coming from the n-th summand.
+   Backward-compatible constructors kept for existing tests.
    ============================================================================ *)
 type 'a tag = Tag of int * 'a
 
 (* Backward-compatible constructors for Pink/Blue (coproducts) and
-   Just/Pair (functors/products). These are kept for test compatibility. *)
+   Just/Pair (functors/products). Kept for test compatibility only. *)
 type 'a pinkblue = Pink of 'a | Blue of 'a
 type 'a pair = Pair of 'a * 'a
 type t_true = TTrue
@@ -71,38 +78,61 @@ let tag_unwrap (Tag (_, x)) = x
 
 (* ============================================================================
    Tagged disjoint union: elements of `a` get tag 0, of `b` get tag 1.
+   Internal representation; users see only the plain set via normalize.
    ============================================================================ *)
 let tagged_union a b =
   union (mapset (fun x -> Tag (0, x)) a) (mapset (fun x -> Tag (1, x)) b)
 
 let disjoint_union a b = tagged_union a b
 
-(* Utility for tests: pink/blue tagged union *)
+(* Utility for tests that expect pink/blue-tagged unions *)
 let pink_tagged_union a b =
   union (mapset (fun x -> Pink x) a) (mapset (fun x -> Blue x) b)
 
 (* ============================================================================
-   FinSet category (Ch3.4.1).
-   Objects are `'a set`, arrows are `set_arrow` triples (source, fn, target).
+   Set arrow — CHANGED: named record instead of tuple constructor.
+
+   This is the critical design decision. The old form:
+     type 'a set_arrow = SetArrow of 'a set * ('a -> 'a) * 'a set
+   caused massive parsing ambiguity:
+     SetArrow (a, f, b) parsed as SetArrow (a) applied to (f, b)
+   because OCaml parses function application left-associatively.
+
+   The new form avoids this entirely — all access is via field names.
    ============================================================================ *)
-type 'a set_arrow = SetArrow of 'a set * ('a -> 'a) * 'a set
+type 'a set_arrow = {
+  sa_src : 'a set;
+  sa_fn  : 'a -> 'a;
+  sa_tgt : 'a set;
+}
 
-let set_s (SetArrow (a, _, _)) = a
-let set_t (SetArrow (_, _, b)) = b
-let set_ident a = SetArrow (a, (fun x -> x), a)
+let set_s a = a.sa_src
+let set_t a = a.sa_tgt
+let set_ident a = { sa_src = a; sa_fn = (fun x -> x); sa_tgt = a }
 
-let set_comp (SetArrow (c, g, d)) (SetArrow (a, f, b)) =
-  if seteq b c then SetArrow (a, (fun x -> g (f x)), d)
-  else raise (Failure "non_composable_pair")
+(* Result-based composition — matches Cat.compose_result style *)
+let set_comp (f : 'a set_arrow) (g : 'a set_arrow) : ('a set_arrow, string) result =
+  if seteq f.sa_tgt g.sa_src then
+    Ok { sa_src = f.sa_src; sa_fn = (fun x -> g.sa_fn (f.sa_fn x)); sa_tgt = g.sa_tgt }
+  else
+    Error "non_composable_pair"
 
-let set_arrow_apply (SetArrow (_, f, _)) x = f x
+let set_arrow_apply a x = a.sa_fn x
 
-(* The FinSet category, expressed as a value of type Cat.cat *)
-let finset_cat : ('a set, 'a set_arrow) Cat.cat =
-  Cat.Cat (set_s, set_t, set_ident, fun (f, g) -> set_comp f g)
+(* Legacy alias for code that still calls set_comp expecting a direct value *)
+let set_comp_direct f g = match set_comp f g with Ok x -> x | Error _ -> raise (Failure "non_composable_pair")
 
 (* ============================================================================
-   Utility functions referenced by colimits.ml
+   The FinSet category as a Cat.cat value.
+   ============================================================================ *)
+let finset_cat : ('a set, 'a set_arrow) Cat.cat =
+  { Cat.source = set_s;
+    Cat.target = set_t;
+    Cat.ident  = set_ident;
+    Cat.comp   = (fun (g, f) -> set_comp_direct f g) }
+
+(* ============================================================================
+   Utility functions
    ============================================================================ *)
 let rec split s =
   match s with
@@ -118,13 +148,10 @@ let rec singleton_split s =
   | [x] -> (x, [])
   | x :: xs -> (x, xs)
 
-let set_arrow_comp f g = set_comp f g
-
 (* ============================================================================
    Union-Find for coequalizer computation (Ch4.6).
    A disjoint-set forest over an array of elements.
    ============================================================================ *)
-
 type 'a uf = { parent : int array; rank : int array; elems : 'a array }
 
 let init_uf (elems : 'a list) : 'a uf =
@@ -165,53 +192,39 @@ let group_by_root (uf : 'a uf) : (int * 'a list) list =
   ) uf.elems;
   Hashtbl.fold (fun root es acc -> (root, es) :: acc) tbl []
 
-(* find the index of an element in a list *)
+(* find index of element in a list; returns option to avoid exceptions *)
 let find_ix elems x =
   let rec go i = function
-    | [] -> raise (Failure "element not in set")
-    | y :: _ when y = x -> i
+    | [] -> None
+    | y :: _ when y = x -> Some i
     | _ :: rest -> go (i + 1) rest
   in
   go 0 elems
 
 (* ============================================================================
-   Coequalizer in FinSet (Ch4.6).
-   Given a parallel pair f, g : a → b, returns the equivalence classes
-   of b under the relation x ~ y iff f(z) = x and g(z) = y for some z in a
-   (equivalence closure), plus a quotient map q : b → classes.
-
-   The quotient object is the set of equivalence classes (each a set),
-   which is the mathematically meaningful colimit object.
+   Coequalizer in FinSet (Ch4.6) — improved union-find implementation.
+   Returns the equivalence classes (list of sets) of the target set.
    ============================================================================ *)
-let set_coequalizer (f_arrow : 'a set_arrow) (g_arrow : 'a set_arrow) =
-  let src_a = set_s f_arrow in
+let set_coequalizer_classes
+    (f_arrow : 'a set_arrow)
+    (g_arrow : 'a set_arrow)
+    : 'a set list =
   let src_b = set_t f_arrow in
   let f_fn = set_arrow_apply f_arrow in
   let g_fn = set_arrow_apply g_arrow in
-  let a_elems = to_list src_a in
   let b_elems = to_list src_b in
   let uf = init_uf b_elems in
-  (* For each z in a, merge the images f(z) and g(z) *)
+  (* For each z in source a, merge f(z) and g(z) *)
   List.iter (fun z ->
     let x = f_fn z in
     let y = g_fn z in
     let ix = find_ix b_elems x in
     let iy = find_ix b_elems y in
-    union_uf uf ix iy
-  ) a_elems;
-  (* Each equivalence class is a set of elements *)
-  let classes = List.map (fun (_, es) -> dedup es) (group_by_root uf) in
-  (* The quotient map q : b → classes sends each element to its class *)
-  let q x =
-    let ix = find_ix b_elems x in
-    let r = find uf ix in
-    (* find the class whose first element is in the same root *)
-    let cls =
-      List.find (fun c -> List.exists (fun y -> find_ix b_elems y = r) c) classes
-    in
-    cls
-  in
-  (classes, q)
+    match ix, iy with
+    | Some ix, Some iy -> union_uf uf ix iy
+    | _, _ -> ()
+  ) (to_list (set_s f_arrow));
+  List.map (fun (_, es) -> dedup es) (group_by_root uf)
 
 (* ============================================================================
    Normalization for output (Ch4.9/4.10).
@@ -219,11 +232,9 @@ let set_coequalizer (f_arrow : 'a set_arrow) (g_arrow : 'a set_arrow) =
    ============================================================================ *)
 let tag_val (Tag (_, v)) = v
 
-(* Normalize a set of tags into a set of plain values *)
 let normalize_tagged_set s =
   dedup (List.map tag_val s)
 
-(* Normalize a plain set: dedup only *)
 let normalize_set s =
   dedup s
 

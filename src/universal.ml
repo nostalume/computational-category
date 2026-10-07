@@ -1,58 +1,75 @@
 (* ============================================================================
    Universal Constructions — initial/terminal objects, coproducts/products,
    coequalizers/equalizers, pushouts/pullbacks (Ch4.2, Ch4.8, Ch4.9).
-   ============================================================================ *)
-
-(* ============================================================================
-   Types for universal constructions.
-   Each pairs a structure with its universality (functional representation).
+   Layer 2: each construction is a named record carrying its universality.
    ============================================================================ *)
 
 (* Initial object: object + universal arrow to any object *)
-type ('o, 'a) initial_obj = 'o * ('o -> 'a)
+type ('o, 'a) initial_obj = {
+  init_obj : 'o;
+  init_univ : 'o -> 'a;
+}
 
 (* Terminal object (dual of initial) *)
-type ('o, 'a) terminal_obj = 'o * ('o -> 'a)
+type ('o, 'a) terminal_obj = {
+  term_obj : 'o;
+  term_univ : 'o -> 'a;
+}
 
-(* Binary coproduct: objects a b -> (coproduct object, 2 injection arrows, universality) *)
+(* Binary coproduct: objects a b -> (coproduct data, universality) *)
+type ('o, 'a) coproduct_data = {
+  coprod_obj : 'o;
+  coprod_inj1 : 'a;
+  coprod_inj2 : 'a;
+}
+
+(* coproduct operator: a b -> (data, univ)
+   univ: c f g -> unique [f,g] : coprod -> c *)
 type ('o, 'a) coproduct =
   'o * 'o ->
-  (('o * 'a * 'a) * ('o * 'a * 'a -> 'a))
+  (('o, 'a) coproduct_data * ('o -> 'a -> 'a -> 'a))
 
 (* Binary product (dual of coproduct) *)
+type ('o, 'a) product_data = {
+  prod_obj : 'o;
+  prod_proj1 : 'a;
+  prod_proj2 : 'a;
+}
+
 type ('o, 'a) product =
   'o * 'o ->
-  (('o * 'a * 'a) * ('o * 'a * 'a -> 'a))
+  (('o, 'a) product_data * ('o -> 'a -> 'a -> 'a))
 
 (* Coequalizer of parallel pair *)
+type ('o, 'a) coequalizer_data = {
+  coeq_obj : 'o;
+  coeq_arrow : 'a;
+}
+
 type ('o, 'a) coequalizer =
   'a * 'a ->
-  (('o * 'a) * ('o * 'a -> 'a))
+  (('o, 'a) coequalizer_data * ('o -> 'a -> 'a))
 
 (* Equalizer (dual of coequalizer) *)
+type ('o, 'a) equalizer_data = {
+  eq_obj : 'o;
+  eq_arrow : 'a;
+}
+
 type ('o, 'a) equalizer =
   'a * 'a ->
-  (('o * 'a) * ('o * 'a -> 'a))
-
-(* Pushout: two arrows with common source -> (pair of arrows, universality) *)
-type ('o, 'a) pushout =
-  'a * 'a ->
-  (('a * 'a) * ('a * 'a -> 'a))
-
-(* Pullback (dual of pushout) *)
-type ('o, 'a) pullback =
-  'a * 'a ->
-  (('a * 'a) * ('a * 'a -> 'a))
+  (('o, 'a) equalizer_data * ('o -> 'a -> 'a))
 
 (* A category with initial object, binary coproducts, coequalizers *)
-type ('o, 'a) io_cp_ce_cat = Io_cp_ce_cat of
-  ('o, 'a) Cat.cat *
-  ('o, 'a) initial_obj *
-  ('o, 'a) coproduct *
-  ('o, 'a) coequalizer
+type ('o, 'a) io_cp_ce_cat = {
+  iocc_cat : ('o, 'a) Cat.cat;
+  iocc_initial : ('o, 'a) initial_obj;
+  iocc_coproduct : ('o, 'a) coproduct;
+  iocc_coequalizer : ('o, 'a) coequalizer;
+}
 
 (* ============================================================================
    Isomorphism between two initial objects (Ch4.2.1)
    ============================================================================ *)
-let iso_initial ((a, univ_a) : ('o, 'a) initial_obj) ((a', univ_a') : ('o, 'a) initial_obj) =
-  (univ_a a', univ_a' a)
+let iso_initial (a : ('o, 'a) initial_obj) (a' : ('o, 'a) initial_obj) =
+  (a.init_univ a'.init_obj, a'.init_univ a.init_obj)

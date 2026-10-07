@@ -1,70 +1,93 @@
 (* ============================================================================
    Graphs and Diagrams — diagram, cocones, cones, colimits, limits (Ch4.4, Ch4.8).
+   Layer 3: all structures use named records instead of tuples.
    ============================================================================ *)
 
-(* Graph: nodes, edges, source, target *)
-type graph = Graph of
-  string list *   (* nodes *)
-  string list *   (* edges *)
-  (string -> string) *  (* source *)
-  (string -> string)    (* target *)
+(* Finite graph: nodes, edges, source, target *)
+type graph = {
+  g_nodes : string list;
+  g_edges : string list;
+  g_src : string -> string;
+  g_tgt : string -> string;
+}
 
-(* Diagram: graph shape + node->object + edge->arrow *)
-type ('o, 'a) diagram = Diagram of
-  graph *
-  (string -> 'o) *
-  (string -> 'a)
+(* Diagram: graph shape + node -> object + edge -> arrow *)
+type ('o, 'a) diagram = {
+  shape : graph;
+  obj_at : string -> 'o;
+  arrow_at : string -> 'a;
+}
 
 (* Cocone: apex + base diagram + sides (node -> arrow) *)
-type ('o, 'a) cocone = Cocone of
-  'o * ('o, 'a) diagram * (string -> 'a)
+type ('o, 'a) cocone = {
+  apex : 'o;
+  base : ('o, 'a) diagram;
+  sides : string -> 'a;
+}
 
-(* Cocone arrow *)
-type ('o, 'a) cocone_arrow = CoconeArrow of
-  ('o, 'a) cocone * 'a * ('o, 'a) cocone
+(* Cocone arrow: a map between two cocones over the same base *)
+type ('o, 'a) cocone_arrow = {
+  ca_domain : ('o, 'a) cocone;
+  ca_arrow : 'a;
+  ca_codomain : ('o, 'a) cocone;
+}
 
-(* Colimiting cocone *)
-type ('o, 'a) colimiting_cocone = ColimitingCocone of
-  ('o, 'a) cocone * (('o, 'a) cocone -> ('o, 'a) cocone_arrow)
+(* Colimiting cocone: a cocone plus its universality *)
+type ('o, 'a) colimiting_cocone = {
+  colim_cocone : ('o, 'a) cocone;
+  colim_univ : ('o, 'a) cocone -> ('o, 'a) cocone_arrow;
+}
 
 (* Colimit: diagram -> colimiting cocone *)
 type ('o, 'a) colimit = ('o, 'a) diagram -> ('o, 'a) colimiting_cocone
 
 (* Cococomplete category *)
-type ('o, 'a) cocomplete_cat = CocompleteCat of
-  ('o, 'a) Cat.cat * ('o, 'a) colimit
+type ('o, 'a) cocomplete_cat = {
+  cc_cat : ('o, 'a) Cat.cat;
+  cc_colimit : ('o, 'a) colimit;
+}
 
-(* Cone (dual to cocone) *)
-type ('o, 'a) cone = Cone of
-  'o * ('o, 'a) diagram * (string -> 'a)
+(* Cone (dual to cocone): used for limits *)
+type ('o, 'a) cone = {
+  cone_apex : 'o;
+  cone_base : ('o, 'a) diagram;
+  cone_sides : string -> 'a;
+}
 
-type ('o, 'a) cone_arrow = ConeArrow of
-  ('o, 'a) cone * 'a * ('o, 'a) cone
+type ('o, 'a) cone_arrow = {
+  ca_domain : ('o, 'a) cone;
+  ca_arrow : 'a;
+  ca_codomain : ('o, 'a) cone;
+}
 
-type ('o, 'a) limiting_cone = LimitingCone of
-  ('o, 'a) cone * (('o, 'a) cone -> ('o, 'a) cone_arrow)
+type ('o, 'a) limiting_cone = {
+  lim_cone : ('o, 'a) cone;
+  lim_univ : ('o, 'a) cone -> ('o, 'a) cone_arrow;
+}
 
 type ('o, 'a) limit = ('o, 'a) diagram -> ('o, 'a) limiting_cone
 
-type ('o, 'a) complete_cat = CompleteCat of
-  ('o, 'a) Cat.cat * ('o, 'a) limit
+type ('o, 'a) complete_cat = {
+  co_cat : ('o, 'a) Cat.cat;
+  co_limit : ('o, 'a) limit;
+}
 
 (* ============================================================================
-   Accessors
+   Accessors (kept for compatibility with existing call sites)
    ============================================================================ *)
-let cocone_apex (Cocone (a, _, _)) = a
-let cocone_base (Cocone (_, d, _)) = d
-let cocone_sides (Cocone (_, _, s)) = s
-let cocone_apex_arrow (CoconeArrow (_, a, _)) = a
-let cone_apex (Cone (a, _, _)) = a
-let cone_base (Cone (_, d, _)) = d
-let cone_sides (Cone (_, _, s)) = s
+let cocone_apex c = c.apex
+let cocone_base c = c.base
+let cocone_sides c = c.sides
+let cocone_apex_arrow ca = ca.ca_arrow
+let cone_apex c = c.cone_apex
+let cone_base c = c.cone_base
+let cone_sides c = c.cone_sides
 
-let diagram_graph (Diagram (g, _, _)) = g
-let diagram_nodes (Diagram (Graph (n, _, _, _), _, _)) = n
-let diagram_edges (Diagram (Graph (_, e, _, _), _, _)) = e
-let diagram_node_objs (Diagram (_, f, _)) = f
-let diagram_edge_arrows (Diagram (_, _, g)) = g
+let diagram_graph d = d.shape
+let diagram_nodes d = d.shape.g_nodes
+let diagram_edges d = d.shape.g_edges
+let diagram_node_objs d = d.obj_at
+let diagram_edge_arrows d = d.arrow_at
 
-let graph_src (Graph (_, _, s, _)) = s
-let graph_tgt (Graph (_, _, _, t)) = t
+let graph_src g = g.g_src
+let graph_tgt g = g.g_tgt
