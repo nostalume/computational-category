@@ -1,0 +1,4 @@
+open Computational_category
+module F = Instances.Finite_sets.Make (struct type t = int let equal (a : int) b = a = b end)
+module C = Instances.Finite_set_universals.Make (F)
+let _ = C.partition

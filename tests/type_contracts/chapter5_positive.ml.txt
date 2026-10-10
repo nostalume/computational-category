@@ -1,0 +1,43 @@
+open Computational_category
+module F = Instances.Finite_sets.Make (struct type t=int let equal (x:int) y=x=y end)
+module C = Instances.Finite_set_universals.Make (F)
+module L = Instances.Finite_set_universals.Make (F)
+module P = Instances.Finite_set_universals.Make (F)
+module G = Instances.Finite_graphs.Make (F)
+let get = function Ok x -> x | Error _ -> failwith "positive admission"
+let a=F.singleton (F.atom 1)
+let graph=get (G.graph ~nodes:a ~edges:[])
+let product=get (G.product (graph,graph))
+let fid=Foundations.Functor.id_functor F.cat
+let comma=get (Constructions.Comma.object_ fid fid a (F.ident a) a)
+let square=get (Constructions.Comma.arrow fid fid comma (F.ident a,F.ident a) comma)
+let twisted=get (Constructions.Elementary.Twisted.arrow F.cat (F.ident a) (F.ident a,F.ident a) (F.ident a))
+let domain=get (Constructions.Functor_category.finite_domain Constructions.Elementary.one ~objects:[()] ~arrows:[()])
+let functor_=get (Constructions.Functor_category.constant_functor domain F.cat a)
+let natural=get (Constructions.Functor_category.natural functor_ functor_ (fun () -> Ok (F.ident a)))
+let fc=Constructions.Functor_category.category domain F.cat
+let functor_limits=Constructions.Functor_category.complete domain L.complete_finset
+let shape=get (Universal.Diagrams.graph ~nodes:["n"] ~edges:[])
+let diagram=get (Universal.Diagrams.diagram F.cat shape ~objects:["n",a] ~arrows:[])
+let abstract=Universal.Limits.Free.fixed_colimit F.cat shape C.set_colimit
+let free=get (abstract.Universal.Limits.Free.free diagram)
+module I = struct
+  type base_obj=unit
+  type base_arr=unit
+  type fiber_obj=F.set
+  type fiber_arr=F.arrow
+  let base=Constructions.Elementary.one
+  let fiber ()=F.cat
+  let valid_object () _=true
+  let transport ()=Ok fid
+end
+module Indexed=Constructions.Indexed.Make (I)
+let indexed=get (Indexed.object_ () a)
+let indexed_arrow=get (Indexed.arrow indexed () (F.ident a) indexed)
+let () =
+  assert (fc.Foundations.Category.equal_arr (get (Foundations.Category.compose fc natural natural)) natural);
+  assert (F.cardinality (G.nodes (fst product).Universal.Limits.prod_obj)=1);
+  assert (Indexed.category.Foundations.Category.equal_arr
+    (get (Foundations.Category.compose Indexed.category indexed_arrow indexed_arrow)) indexed_arrow);
+  print_endline "Chapter5 public consumer passed"
+

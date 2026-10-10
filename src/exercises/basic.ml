@@ -1,5 +1,5 @@
 (* ============================================================================
-   Core — shared foundational types and utilities.
+   Basic — shared foundational types and utilities.
    Natural numbers, binary trees, list functions, monoids.
    ============================================================================ *)
 
@@ -77,4 +77,4 @@ let poly coeffs x =
 type 'a monoid = { op : 'a * 'a -> 'a; identity : 'a }
 
 let free_monoid_hom (m : 'a monoid) f lst =
-  fold (fun x acc -> m.op (f x, acc)) m.identity lst
+  List.fold_left (fun acc x -> m.op (acc, f x)) m.identity lst

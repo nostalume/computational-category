@@ -1,3 +1,11 @@
-(test
- (name functional_test)
- (libraries computational_category unix))
+(library
+ (name category_test_support)
+ (modules checks finite_set_fixture toy_category)
+ (libraries computational_category))
+
+(tests
+ (names foundations_test universal_test spans_relations_test
+        constructions_test functor_category_test indexed_test)
+ (modules foundations_test universal_test spans_relations_test
+          constructions_test functor_category_test indexed_test)
+ (libraries category_test_support computational_category))

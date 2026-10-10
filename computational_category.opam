@@ -1,14 +1,14 @@
 opam-version: "2.0"
-name: "computational-category"
+name: "computational_category"
 version: "0.1.0"
 synopsis: "Computational Category Theory learning exercises in OCaml"
-description: "OCaml implementations of ML exercises from the Computational Category Theory book, covering categories, functors, natural transformations, and monoids."
+description: "OCaml implementations of ML exercises from the Computational Category Theory book, covering selected foundations, finite universal constructions, relations, category constructions, and finite-domain natural transformations."
 authors: ["Learning Project"]
 maintainer: ["Learning Project"]
 license: "MIT"
-homepage: "https://github.com/example/computational-category"
-bug-reports: "https://github.com/example/computational-category/issues"
-dev-repo: "git+https://github.com/example/computational-category.git"
+homepage: "https://github.com/nostalume/computational-category"
+bug-reports: "https://github.com/nostalume/computational-category/issues"
+dev-repo: "git+https://github.com/nostalume/computational-category.git"
 tags: ["learning" "category-theory" "ml" "ocaml" "education"]
 
 build: [
@@ -18,7 +18,7 @@ build: [
 
 depends: [
   "ocaml" {>= "4.14"}
-  "dune" {>= "3.0"}
+  "dune" {>= "3.7"}
 ]
 
 x-maintain-files: [
@@ -26,4 +26,5 @@ x-maintain-files: [
   "dune-project"
   "src"
   "tests"
+  "docs"
 ]

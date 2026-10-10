@@ -1,159 +1,240 @@
-# Architecture Plan: OCaml Computational Category Theory Learning Project
+# Architecture Plan: Mathematical Hierarchy for Computational Category Theory
 
-## Goal and Authority
+Canonical, tracked handoff for E:/Proj/course/computational-category.
+Only this file governs the current refactor. [Historical delivery evidence](evidence/pre-layout-audit.md)
+retains the previous Chapter 2-5 work and its scoped proof/exercise qualifications;
+it is not a second active plan. Do not untrack this file or change ignore policy.
 
-This plan governs the development of an OCaml learning project based on computational category theory from the referenced text. The project is **exploratory** in nature — intended for learning, experimentation, and shareable code artifacts. No production commitment is claimed.
+## Mathematical-layout refactor — 2026-10-10
 
-**Current revision**: E:\Proj\course\computational-category
-**Decision maturity**: Candidate (functional module scaffold implemented; awaiting build verification)
-**Primary lenses**: module-topology, representation-and-flow, authority-and-effects, mathematics-and-numerics
 
-**Authoritative input**: Chapter 2 exercises completed; Chapter 3-4 concepts provided; remaining chapters TBD from PDF source.
+### Authority and status
+Requested consequence: repair the mathematical module layout, in four stages.
+The user's latest agreement authorizes Stage 13 integrated acceptance.
+The LOC-reduction preference remains local to this development: reduce justified
+duplication, never mathematical coverage or type boundaries for a count.
+Clean local public-module/API migration and declared Dune minimum 3.7 are
+approved design choices. Installed Dune 3.24.2 needs no upgrade.
+Historical Stages 1-9 remain completed evidence. All four layout stages 10-13
+are complete; no further implementation stage is proposed by this plan.
 
----
+Keep one wrapped computational_category package and OCaml >=4.14. Preserve
+existing mathematics, lawful capability premises, abstract admitted types,
+custom equality, result errors, exception propagation, composition order,
+finite source enumeration, uniform fibers and injective DPO scope.
+No Chapter 6 implementation, algorithm rewrite, install, publication, commit,
+worktree or independent-agent task is part of this refactor.
 
-## Decision: Single Package, Organized by Functionality
+### Revision-scoped evaluation
+HEAD remains 10ddb0c2cac79b8ef3c7433ef7a423c4f6c7262c, with the delivered work
+uncommitted. Source/tests/manifests/docs and their callers were inspected;
+no applicable AGENTS.md was found. Stage 10 entry src had 17 implementations, 6 interfaces,
+2,163 implementation lines and 97,267 implementation bytes. The Stage 10 entry
+canonical plan has 123,943 bytes. Counts establish scale, not a file-size gate.
 
-The user directed that the project be consolidated into **one package** (rather than per-chapter packages with cross-imports), and that modules be distributed **by functionality** rather than by book chapter organization.
+Observed ownership problems:
+- Graphs combines diagram shapes/admission, chosen universal capabilities,
+  the generic colimit algorithm, duality and universal-map operations. Its name
+  also obscures the distinction from actual graph objects in Finite_graphs.
+- Functors combines base functor capabilities, diagram mapping/preservation
+  and concrete FinSet square operations; ocamldep confirms imports of both
+  Graphs and Finite_sets.
+- Colimits and Limits are actually FinSet instances, not generic theory.
+- Relations mixes generic spans with concrete finite carriers/images.
+  Term_category also contains an unrelated three-object textbook category.
+- Abstract_limits and Twisted_arrows preserve useful mathematics but need not
+  be independent physical files: named children of their natural owners suffice.
+- functional_test and chapter5_test mix mathematical subjects; file chronology
+  does not express capability ownership.
+- The canonical plan is an oversized audit log, larger than all implementation
+  files combined, rather than a concise active handoff.
 
-### Rationale
-- Chapter 4 (limits/colimits) depends heavily on Chapter 3 (categories/functors/duality). Separating into per-chapter packages requires cross-package imports, which is inefficient versus direct module imports.
-- Some exercises are instances; others are generalizations. Isolating them by chapter fragments a coherent concept (e.g., "universal constructions" spans Ch4.2 initial objects, coproducts, coequalizers AND Ch4.9 terminal objects, products, equalizers).
-- Functionality grouping keeps a concept and its specializations together in one module, where the generalization naturally builds on the instances.
+Counter-evidence: dependencies are acyclic and universal algorithms are already
+shared. Interfaces protect real admission/type boundaries, not redundant
+ceremony. Seventeen modules for this scope is not itself excessive.
+The defect is mixed owners and unrelated flat exposure, not simply file count.
 
-### Outcome: One `computational_category` library, flat `src/` with functional modules.
+Inspected flow: graph bindings/frozen FinSet maps -> admitted comma object ->
+inherited graph product -> swapped comma duality -> shared generic colimit/
+FinSet dual primitives -> checked projections and mediator. Invalid incidence
+or squares return Cat.error. This flow has no required persistent runtime effect.
 
----
+### Settled owner/dependency decisions
+The new user-owned hierarchy objective reopens C5.3's flat physical projection
+only. Its invariant ownership, shape/object distinction, sharing and no-cycle
+constraints remain. General theory must not import concrete instances.
 
-## Module Layout (Functional)
+1. Foundations: category dictionaries/errors and general functor capabilities,
+   identities, composition and opposites; no FinSet or diagram dependency.
+2. Diagrams: shapes, diagram/cone/cocone admission and their morphisms,
+   triangle checks and mapping through general functors.
+3. Universal constructions: primitive universal contracts, chosen (co)limits/
+   capability data, one generic finite-colimit algorithm, dual limits,
+   binary specializations, induced universal maps and fixed-shape Free/Cofree.
+   Move chosen-capability/algorithm operations out of Diagrams so Diagrams
+   never needs to import their owner back.
+4. Preservation: continuity/cocontinuity and inverse-functor transport; depends
+   on the preceding owners, not on concrete FinSet.
+5. Category constructions: elementary, comma, finite-domain functor categories,
+   indexed categories and generic spans. Keep their distinct admission laws.
+   Nest one/product/slice/coslice/twisted under one elementary owner.
+6. Instances: FinSet values and concrete universal operations, finite graphs,
+   finite relation carriers/images, and terms/substitutions. Consolidate
+   concrete colimits/limits/square operations around the same supplied F without
+   duplicating its value universe or private partition scratch. Graph-specific
+   Labelled/Rewriting stay named children, not extra facades or an NFA compiler.
+7. Exercises: standalone Chapter 2 algorithms, not categorical infrastructure.
+   Move the textbook FiniteCategory example once to shared test fixture support:
+   its only inspected callers are functional_test and chapter5_test.
+   Do not keep it inside terms or duplicate it in both suites.
 
-All modules live in `src/`, compiled into a single library `computational_category`:
+Candidate physical projection (owners govern; exact private syntax is not frozen):
 
-| Module | Functionality | Covers |
-|---|---|---|
-| `core.ml` | Foundational types/utilities: num, bintree, lists, monoids | Ch2 Ex3/5/6/11 |
-| `cat.ml` | Category type, accessors, composition, `dual_cat` | Ch3.3, Ch3.6 |
-| `finite_sets.ml` | Set operations, tagged values, set_arrow, FinSet category | Ch2 Ex9, Ch3.4.1, Ch4.6/4.9 |
-| `term_category.ml` | TΩ_Fin term category, finite 3-object category | Ch3.4.2, Ch3.4.3 |
-| `graphs.ml` | Graph, diagram, cocone, cone, colimit, limit types | Ch4.4, Ch4.8 |
-| `universal.ml` | Universal construction types: initial/terminal, coproduct/product, coequalizer/equalizer, pushout/pullback | Ch4.2, Ch4.9 |
-| `colimits.ml` | Finite colimit construction (Thm 1), colimits in FinSet | Ch4.5, Ch4.6, Ch4.7 |
-| `limits.ml` | Duality-converted limits, limits in FinSet | Ch4.8, Ch4.9 |
-| `functors.ml` | Functor type, identity/product functors, dual_functor, cocontinuous functors | Ch3.5, Ch3.6, Ch4.4 |
-| `relations.ml` | Spans, pullback, relation composition | Ch4.10 |
+src/
+  foundations/  category.ml, functor.ml
+  universal/    diagrams.ml, limits.ml, preservation.ml
+                # limits owns both dual families and named Free/Cofree operations
+  constructions/
+                elementary.ml, comma.ml, functor_category.ml, indexed.ml, spans.ml
+  instances/    finite_sets.ml, finite_set_universals.ml, finite_graphs.ml,
+                finite_relations.ml, terms.ml
+  exercises/    basic.ml
 
-### Dependency order (acyclic)
-```
-core, cat
-  -> finite_sets, term_category, universal, graphs
-  -> colimits (uses finite_sets, graphs, universal, cat)
-  -> limits (uses colimits, cat, finite_sets, graphs, universal)
-  -> functors (uses cat, finite_sets, graphs)
-  -> relations (uses finite_sets, graphs, limits, cat)
-```
+Source namespaces follow directories, e.g.
+Computational_category.Foundations.Category,
+Computational_category.Universal.Diagrams,
+Computational_category.Constructions.Comma,
+Computational_category.Instances.Finite_graphs.
+This is a dependency-aware hierarchy, not a linear ranking of mathematical
+importance: graph instances use both generic comma theory and concrete FinSet.
 
----
+Use native Dune include_subdirs qualified, not handwritten re-export layers
+or per-chapter packages. Official documentation confirms directory-derived
+module groups:
+[Dune include_subdirs](https://dune.readthedocs.io/en/stable/reference/dune/include_subdirs.html).
+Installed Dune CHANGES.md records qualified OCaml support in its 3.7.0 section.
+Both language declaration and manifest minimum change coherently to 3.7.
+Actual nested-module compilation is an early bounded probe, not verified by
+documentation alone. Running the actual Dune 3.7/OCaml 4.14 minima remains
+unverified unless those toolchains are available and tested.
 
-## Decision Owners and Lenses
+Clean cutover is user-approved: migrate repository callers, examples, tests,
+interfaces and documentation; retire superseded module names. Do not retain
+Graphs/Colimits/Limits forwarding facades solely for yesterday's layout.
+No external compatibility release is promised. A newly discovered supported
+external consumer reopens only this boundary.
 
-| Decision | Owner Lens | Key Constraints |
-|---|---|---|
-| Module boundaries | `module-topology` | One owner per functional concept; dependency acyclic; no cross-package imports |
-| Datatype vocabulary & invariants | `domain-and-invariants` | One owner per concept; illegal states unrepresentable |
-| Function types & polymorphism | `representation-and-flow` | Smallest complete representation; typed admission |
-| Category theory structure adherence | `mathematics-and-numerics` | Categorical axioms preserved; duality/universality correct |
-| Cost & workload | `cost-and-scale` | No performance requirements; learning project |
-| Authority | `authority-and-effects` | One authority per fact/transition |
+Tests should mirror mathematical subjects and keep shared fixtures only where
+multiple callers justify them. Chapter numbers remain a book/exercise index
+in docs/chapter5.md, not production namespaces. Do not copy that guide into
+several new theory manuals. Compact the active canonical plan during
+implementation; preserve old execution evidence once in an explicitly
+historical audit artifact with a distinct lifecycle. Keep the plan tracked
+and leave ignore rules unchanged.
 
----
+Alternatives:
+- Folder-only moves with old flat/mixed modules: insufficient ownership repair.
+- One giant theory file: hides distinct admission and instance boundaries.
+- Per-chapter libraries/one file per theorem: adds wiring without a consumer.
+- Semantic groups plus selected merges/extractions: selected. Fewer unrelated
+  top-level owners, not a promised dramatic drop in total files or removal of mli.
 
-## Settled Decisions
+### Stage 10 — Recoverable baseline and namespace feasibility
+Consumer: implementer/reviewer. Dependency: implementation authorization.
+- [x] 10.1 Preserve a recoverable snapshot of the actual dirty working tree;
+  inventory current public symbols and assign each one destination owner.
+  Capture baseline checks. Never reset to HEAD, which lacks delivered work.
+  Keep the canonical handoff compact and preserve old audit evidence once.
+- [x] 10.2 Probe qualified nested imports, sealing and wrapped public consumer
+  resolution in owned temporary scope using existing tools. Confirm no
+  parent-module cycle or requirement beyond the accepted Dune floor.
+Exit: recovery input, API map, baseline evidence and feasible namespace mechanism.
+A failed probe reopens only the tooling projection before real manifest changes.
 
-### 1. Language Choice: OCaml
-- **Decision**: OCaml implementation language.
-- **Maturity**: Settled.
+### Stage 11 — Buildable owner and namespace cutover
+Consumer: library callers. Dependency: Stage 10.
+- [x] 11.1 Separate diagram/universal/functor owners, consolidate elementary/
+  free/concrete FinSet operations, separate spans from finite images and place
+  them in semantic groups. Migrate all source/test/example/fixture callers as
+  part of the same coherent cutover; preserve type abstractions and behavior.
+Exit: normal-profile build/tests and public compiler fixtures use new paths;
+general theory imports no concrete instance or test fixture modules.
+A partly renamed, broken repository is not a delivered stage.
 
-### 2. Build System: Opam + Dune
-- **Decision**: opam package manager; Dune build. Single package `computational_category`.
-- **Maturity**: Settled. Note: dune not yet installed in switch; requires `opam install dune`.
+### Stage 12 — Mathematical navigation and public explanation
+Consumer: learners/maintainers. Dependency: Stage 11.
+- [x] 12.1 Reorganize durable tests by mathematical subjects while retaining all
+  33 delivered behavioral-group obligations and independent oracles. Preserve
+  failure and mutation sensitivity. Keep one shared toy-category fixture;
+  do not create one-case files or clone harnesses for symmetry.
+- [x] 12.2 Update README owners/navigation, guide code/links and local migration
+  instructions. Retain all twelve exercise solutions and general proofs with
+  finite/uniform/injective qualifications; remove stale source/API references.
+Exit: each capability has one code owner, discoverable tests and accurate paths;
+one book exercise index, no copied manuals or old-name facades.
 
-### 3. Single Package, Functional Modules
-- **Decision**: One `computational_category` library; modules distributed by functionality (not book chapter). No per-chapter sub-packages.
-- **Maturity**: Settled.
-- **Falsifier**: If a future chapter introduces a concept that genuinely needs a separate reusable library boundary (not just a module), reopen.
+### Stage 13 — Integrated acceptance and topology audit
+Consumer: final reviewer. Dependency: Stage 12.
+- [x] 13.1 Fresh owned-scratch build/runtest, positive/expected-negative public
+  consumer compilation, both documentation examples, dependency and sealing
+  inspection, manifest agreement, links and actual-diff conformance.
+  Record bounded evidence without copying raw logs into the active plan.
+Exit: equivalent categorical results/errors, equality universes and admission;
+no duplicated algorithm/type authority, cycle, cast, missing exercise,
+test-fixture library dependency or stale path; local-only recoverable changes.
+Preserve previous enumeration evidence where fixtures are unchanged; changing
+test files/executable counts alone is not gain or loss of mathematical coverage.
 
-### 4. Ephemeral Planning Docs Location
-- **Decision**: Planning in `.agents/plan/`; public README holds only stable content.
-- **Maturity**: Settled.
+### Pre-implementation audit
+Self-audit found no owner/compatibility-policy blocker after the two user choices.
+Namespace feasibility is verified by the bounded Stage 10 probe, not by a
+product cutover or minimum-toolchain execution claim.
+Every merge retains the mathematical child/invariant; each extraction removes
+a concrete/general dependency or separates admission from universal construction.
+No new runtime effect, resource guarantee or proof-strength claim is introduced.
 
----
+Reopen only affected decisions for a qualified-module cycle, lost abstract type
+identity, a supported external consumer, or a redundant facade exposed by the
+actual diff. Do not rewrite algorithms to rescue a directory scheme.
+Recovery uses the preserved working-tree snapshot, not broad deletion/reset.
 
-## Exploratory Unknowns and Open Questions
+### Completed deliveries and next handoff
 
-| Unknown | Owner | Potential Resolution |
-|---|---|---|
-| Full colimit/limit execution correctness in FinSet | `mathematics-and-numerics` | Verify by computing Ch4.7 pushout example; add property tests |
-| ML vs OCaml syntax porting of the recursive colimit algorithms | `representation-and-flow` | Test `set_coequalizer` recursion; validate against Ch4.6 |
-| Rational number representation (Ch2 Ex7) | `domain-and-invariants` | Deferred; not yet needed by category theory modules |
-| Dune availability for local build | `cost-and-scale` | `opam install dune`; fallback to `ocamlc` direct compilation for verification |
+[Layout evidence](evidence/layout-refactor-evidence.md) owns revision-scoped
+commands, API inventory, recovery identities, bounded outcomes and limitations.
+Stage 10 preserved the dirty baseline and verified qualified namespaces.
+Stage 11 delivered five production groups, 16 implementations and 8 interfaces,
+with 33 behavioral groups, public/type/example checks and 25 signature contracts.
+The actual Dune 3.7 / OCaml 4.14 minima remain untested.
 
----
+Stage 12 keeps six executables but organizes them by mathematical subjects:
+foundations (5 groups), universals (8), spans/relations (7), constructions/graphs
+(7), functor categories (4), indexed/free-cofree (2). One private support library
+owns checks, a shared bounded FinSet fixture and the sole toy category. Independent
+oracles remain local. README links code owners and suites and explains the clean
+local API migration; the book guide retains all twelve proofs/qualifications.
 
-## Materialized Plan Artifact
+Measured against Stage 12 entry: test source 1,868 -> 1,851 lines, test wiring
+34 -> 11, reader docs 759 -> 751; production remains byte-identical (2,685 lines).
+Fresh checks preserve all 33 groups/counters, both positives, ten expected type
+rejections, both examples and three representative mutation sensitivities.
+This is Stage 12 evidence, not completion of Stage 13's full topology acceptance.
 
-**Location**: `E:\Proj\course\computational-category\.agents\plan\architecture-plan.md`
+### Stage 13 acceptance
 
-**Plan audit** (self-check per `plan-audit.md`):
-- ✅ Each decision has one owner, settled maturity, and no hidden tradeoff
-- ✅ Module boundaries are acyclic and each owns a distinct functional concept
-- ✅ Single-package design removes cross-package import overhead
-- ✅ Instances and generalizations co-located (e.g., coproduct/product in `universal.ml`)
-- ✅ Minimum behavior observable: each module compiles and tests pass
+Fresh integrated build/runtest, both public positives, ten admission/type
+rejections, four extra boundary checks, both guide examples and 25 original
+signature contracts passed. Dependency extraction is acyclic; generic theory
+imports neither concrete instances nor test support. Local install metadata
+excludes test support. All twelve exercises, scoped qualifications, native
+owners, manifest floors, links and accepted input hashes were inspected.
 
-**Falsification**: If a subsequent implementer cannot build and test the library from this artifact and the current repository state without hidden conversation, the plan fails audit and must be revised at the smallest affected owner.
+No acceptance blocker or production/test/doc edit was needed. All four layout
+stages are complete; this is local acceptance, not formal proof, minimum-version
+or cross-platform validation, installation, publication or a commit.
+Whole-refactor production counts: .ml 2,163 -> 2,154; .mli 419 -> 531. Explicit
+sealing declarations explain the interface increase; total source LOC did not
+fall. Stage 12's 40-line test/wiring and 8-line reader-doc reductions remain.
 
----
-
-## First Executable Work
-
-The functional module scaffold is in place in `src/`. The first task for `software-development` is **build verification and test execution**:
-
-### Stage 1: Build Environment
-1. `opam install dune` (if not already installed).
-2. Verify `dune build` compiles all modules in dependency order.
-
-### Stage 2: Correct OCaml Porting
-1. Fix any OCaml syntax/type errors from the SML-to-OCaml port (finite_sets, term_category, colimits, limits, functors, relations).
-2. Ensure the `set_coequalizer` recursion and `finite_colimit`/`dual_colimit` algorithms are type-correct.
-
-### Stage 3: Test
-1. `dune runtest` executes `tests/functional_test.ml`.
-2. Verify: core (Ch2), categories/duality (Ch3), finite sets, functors, universal constructions, limits (Ch4).
-
-### Stage 4: Validate Ch4.7 Pushout Example
-1. Encode the Ch4.7 pushout diagram in FinSet.
-2. Compute the colimit via `finite_colimit_finset`.
-3. Assert the apex equals `{pink D, pink A, blue pink G, blue pink F, blue blue pink G}`.
-
-**Dependencies**: None (leaf task).
-**Estimated effort**: 2-3 hours.
-**Success criterion**: `dune build` and `dune runtest` pass with zero errors; Ch4.7 pushout validates.
-
----
-
-## Rollback and Reopen Conditions
-
-This plan may be reopened when:
-- New chapter content contradicts the functional module boundaries.
-- Build/type evidence shows a module boundary should move or a concept needs its own library.
-- User policy changes (different language, different package scope).
-
-When reopened, the plan delta records: changed evidence, affected premise and dependents, new resolution and maturity, unchanged invariants, and renewed evidence.
-
----
-
-## Audit Note
-
-This plan reflects the single-package, functionality-organized design per user direction. It is materialized in `.agents/plan/` and does not edit ignore policy merely to exist.
-
-**Next**: Hand off to `software-development` for build verification, OCaml porting fixes, and test execution.
+Retain recovery/evidence bundles while work remains uncommitted. Any future
+restore or cleanup must account for newer changes; never reset to HEAD.

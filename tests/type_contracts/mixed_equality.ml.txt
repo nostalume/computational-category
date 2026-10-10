@@ -1,0 +1,6 @@
+open Computational_category
+module Standard = struct type t = int let equal (a : int) b = a = b end
+module Magnitude = struct type t = int let equal a b = abs a = abs b end
+module F = Instances.Finite_sets.Make (Standard)
+module G = Instances.Finite_sets.Make (Magnitude)
+let _ = F.seteq (F.of_list []) (G.of_list [])

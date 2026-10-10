@@ -1,0 +1,2 @@
+open Computational_category
+let _ : Universal.Diagrams.graph = { nodes = []; edges = [] }

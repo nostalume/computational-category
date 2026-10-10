@@ -1,18 +1,17 @@
-(lang dune 3.0)
-(name computational-category)
+(lang dune 3.7)
+(name computational_category)
 (version 0.1.0)
-(source "github")
-(github "example/computational-category")
+(source (github nostalume/computational-category))
 (authors "Learning Project")
 (maintainers "Learning Project")
 (license MIT)
-(keywords ("category-theory" "ml" "ocaml" "education"))
 (package
- (name computational-category)
+ (name computational_category)
  (synopsis "Computational Category Theory learning exercises in OCaml")
  (description
   "OCaml implementations of ML exercises from the Computational Category Theory book,
-   covering categories, functors, natural transformations, and monoids.")
- (dependencies
+   covering selected foundations, finite universal constructions, relations, category constructions, and finite-domain natural transformations.")
+ (tags (learning category-theory ml ocaml education))
+ (depends
   (ocaml (>= 4.14))
-  (dune (>= 3.0))))
+  (dune (>= 3.7))))

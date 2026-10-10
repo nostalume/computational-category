@@ -1,0 +1,3 @@
+open Computational_category
+let bad = { Constructions.Functor_category.object_entries = [] }
+

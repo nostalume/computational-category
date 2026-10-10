@@ -1,0 +1,9 @@
+open Computational_category
+module I = struct
+ type base_obj=unit type base_arr=unit type fiber_obj=unit type fiber_arr=unit
+ let base=Constructions.Elementary.one let fiber ()=base let valid_object () ()=true
+ let transport ()=Ok (Foundations.Functor.id_functor base)
+end
+module G=Constructions.Indexed.Make(I)
+let bad = { G.index = (); value = () }
+

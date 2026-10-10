@@ -1,137 +1,237 @@
-# Computational Category Theory — OCaml Implementation
+# Computational Category Theory in OCaml
 
-## Project Overview
+A learning implementation of selected material from D. E. Rydeheard and
+R. M. Burstall, *Computational Category Theory*: Chapter 2 foundations,
+Chapter 3 categories and functors, and Chapter 4 finite universal constructions
+and relations, followed by Chapter 5 category constructions and exercise solutions.
+This is not a complete implementation of the book.
 
-This project implements selected exercises from *Category Theory for the Sciences* (Spivak) and related category theory material in OCaml. It covers finite sets, categories, functors, universal constructions, colimits, limits, and relations.
+[The Chapter 5 guide](docs/chapter5.md) contains all twelve exercise solutions
+and separates general proofs from finite-domain, uniform-fiber and injective
+rewriting restrictions. Production namespaces follow mathematics, not chapters.
 
-## Layered Architecture
+## Build and test
 
-The code is organized into **layers**, where each layer depends only on the one below it:
+From the repository root, with OCaml and Dune already available on your PATH:
 
+```sh
+dune build --cache=disabled --no-config
+dune runtest --cache=disabled --no-config --force
 ```
-Layer 0: elements & finite sets      (finite_sets.ml)
-Layer 1: category interface          (cat.ml)
-Layer 2: basic colimits              (universal.ml — initial, coproduct, coequalizer)
-Layer 3: generic finite colimits     (graphs.ml — diagram, cocone, colimit)
-Layer 4: concrete category instances (FinSet)
-Layer 5: applications                (colimits.ml, limits.ml, relations.ml)
-```
 
-## Modules
+These commands work in PowerShell as well as a POSIX shell. They create local
+`_build` artifacts; they do not install or publish the package. Use the normal
+development profile: no warning suppression is needed.
 
-| Module | Layer | Responsibility |
-|--------|-------|---------------|
-| `core.ml` | 0 | Natural numbers, binary trees, list utils, monoids (Ch2) |
-| `finite_sets.ml` | 0 | Abstract `set`, `set_arrow`, union-find coequalizer (Ch2, Ch3.4.1, Ch4.6) |
-| `cat.ml` | 1 | `Cat.cat` (named record), `result`-based `compose_result`, dual category (Ch3) |
-| `universal.ml` | 2 | Initial/terminal/coproduct/coequalizer/product/equalizer as **named records** (Ch4.2) |
-| `graphs.ml` | 3 | Graph, diagram, cocone, cone, colimit as named records (Ch4.4) |
-| `term_category.ml` | 4 | Term category TΩ_Fin, finite category examples (Ch3.4.2–3) |
-| `functors.ml` | 4 | Functor, identity/product/dual functors (Ch3.5–3.6) |
-| `colimits.ml` | 5 | FinSet initial/coproduct/coequalizer/pushout (Ch4.6–4.7) |
-| `limits.ml` | 5 | FinSet terminal/product/equalizer via duality (Ch4.8–4.9) |
-| `relations.ml` | 5 | Relations as spans (Ch4.10) |
-| `tests/functional_test.ml` | — | Test suite covering all modules |
+The manifests declare OCaml >= 4.14 and Dune >= 3.7. Verification used OCaml
+5.2.1 and Dune 3.24.2 on Windows with an existing Opam/Cygwin toolchain;
+the declared minimum versions and other platforms have not been verified.
+The library also links OCaml's `unix` library. Toolchain installation and a
+published registry distribution are outside this project's current verification.
 
-## Design Principles Applied
+Success means six executables pass all **33 behavioral groups**, with coverage
+counts. See [Verification and limits](#verification-and-limits).
 
-### 1. Records over tuples
-Every universal construction is a **named record**, not a positional tuple:
+## Public library example
+
+The package and Dune library name is `computational_category`; the public OCaml
+wrapper is `Computational_category`. Code linked against the local library
+starts with `open Computational_category`, not unwrapped module imports.
+
+This complete example composes the book's relations (printed pp. 97–100).
+Composition is **next after previous**. There are four compatible witnesses,
+but only three distinct endpoint pairs.
 
 ```ocaml
-type ('o, 'a) coproduct_data = {
-  coprod_obj : 'o;
-  coprod_inj1 : 'a;
-  coprod_inj2 : 'a;
-}
+open Computational_category
+
+module F = Instances.Finite_sets.Make (struct
+  type t = int
+  let equal (a : int) b = a = b
+end)
+module L = Instances.Finite_set_universals.Make (F)
+module R = Instances.Finite_relations.Make (F)
+
+(* A short example treats unexpected admission failure as a failed assertion.
+   Applications should instead match Error and handle the relevant Foundations.Category.error. *)
+let get = function Ok x -> x | Error _ -> failwith "example admission failed"
+let ints xs = F.of_list (List.map F.atom xs)
+let pairs xs =
+  F.of_list (List.map (fun (x, y) -> F.pair (F.atom x) (F.atom y)) xs)
+
+let () =
+  let a = ints [1; 2] and b = ints [3; 4; 5] and c = ints [6; 7] in
+  let previous =
+    get (R.relation_span ~left:a ~right:b (pairs [1,3; 2,3; 2,4])) in
+  let next =
+    get (R.relation_span ~left:b ~right:c (pairs [3,6; 4,6; 4,7; 5,6])) in
+  let composed = get (Constructions.Spans.compose L.complete_finset next previous) in
+  let image = get (R.image composed) in
+  assert (F.cardinality (Constructions.Spans.span_source composed) = 4);
+  assert (F.seteq image (pairs [1,6; 2,6; 2,7]));
+  Printf.printf "witnesses=%d, image pairs=%d\n"
+    (F.cardinality (Constructions.Spans.span_source composed)) (F.cardinality image)
 ```
 
-Read `d.coprod_obj` instead of `let (a,_,_,_) = ...`.
+Expected output: `witnesses=4, image pairs=3`.
+The example has been compiled, linked and executed as a separate consumer of
+the local wrapped library, without installation. A Dune executable in this
+project can link it with `(libraries computational_category)`.
 
-### 2. Named `set_arrow` (kills tuple-precedence bugs)
-The old `SetArrow of 'a set * ('a -> 'a) * 'a set` constructor caused pervasive
-parsing ambiguity: `SetArrow (a, f, b)` was misparsed as **curried application**
-`SetArrow (a) (f, b)`. Replaced with a record:
+## Values, admission and failure
 
-```ocaml
-type 'a set_arrow = { sa_src : 'a set; sa_fn : 'a -> 'a; sa_tgt : 'a set }
-```
+- `Instances.Finite_sets.Make(E)` owns abstract `value`, `set` and `arrow` types.
+  Distinct equality modules have distinct types; do not mix their objects.
+  `E.equal` must be a stable, terminating equivalence on immutable atoms.
+- Values form a closed recursive universe: `atom`, `tag`, `pair` and
+  `terminal`. Inspect them with `view`. Nested tags and pairs are retained;
+  terminal is a dedicated value, independent of the atom type.
+- `of_list` removes duplicates under the supplied equality; `seteq` is
+  extensional, not list-order equality. `to_list` provides an enumeration,
+  not a canonical ordering. Quotients use actual value representatives;
+  enumeration can change representatives and presentations up to isomorphism.
+  `Instances.Finite_set_universals.Make(F).set_coequalizer_classes` separately exposes immutable
+  classes, not a cast class-list codomain.
+- `F.arrow source callback target` checks every admitted source value's image
+  for target membership. On success it samples the callback once per distinct
+  source value and freezes the map. Use `arrow_result` for checked callbacks.
+  `apply` outside the source returns `Error (Foundations.Category.Outside_domain ...)`.
+- `Foundations.Category.compose category g f` and `F.compose g f` mean **g after f**.
+  The generic operation delegates to the dictionary's checked composition and
+  equality, not OCaml structural equality.
+- Graphs, diagrams, cones, cocones and spans are abstract admitted values.
+  Builders check finite label bindings, endpoints, and applicable commuting
+  equations. Supply complete named bindings; duplicate/missing labels and
+  dangling edges are rejected. `same_base` compares labelled diagrams
+  extensionally under the category's object/arrow equality.
+- In the checked categorical APIs, expected invalid inputs return
+  `('a, Foundations.Category.error) result`: for example
+  `Non_composable`, `Non_parallel`, `Outside_codomain`,
+  `Malformed_graph`, `Malformed_diagram`, `Malformed_term`,
+  `Malformed_relation`, `Different_base` and `Non_commuting`.
+  Constructors that cannot fail on admitted inputs, such as identity, remain
+  direct-returning. User callback/equality exceptions and runtime failures
+  propagate unchanged; they are not disguised as semantic errors.
 
-### 3. `result` instead of exceptions
-`Cat.compose_result` returns `(arrow, string) result`; callers handle failure
-explicitly, making errors composable:
+The retained `Exercises.Basic` exercises have their own original conventions: for example,
+`Exercises.Basic.max_list []` raises `Exercises.Basic.EmptyList`, and `int_pow` assumes a nonnegative
+exponent. The checked categorical API is not a blanket result conversion of Exercises.Basic.
 
-```ocaml
-match compose_result c g f with
-| Ok h -> h
-| Error _ -> ...
-```
+Generic callers must supply lawful, coherent, stable category dictionaries and
+universal capabilities for the same category. Category/functor laws and the
+premises for universal maps are not automatically proved by record construction.
+Dual limit/colimit adapters require a capability for the **opposite** category
+of the input diagram. Term substitutions use finite immutable snapshots and
+syntactic term equality, not alpha-equivalence.
 
-### 4. Layered module signatures
-Each layer exposes only its interface; internal representation (tags, union-find)
-is hidden.
+Callbacks should be pure and terminating. Snapshotting does not make mutable
+atoms safe, prove equality laws, impose timeouts or guarantee bounded memory/stack
+use. An admission returning an error can stop before sampling later inputs.
 
-### 5. Normalization separated from computation
-Internal results keep raw tagged values; `normalize_tagged_set` / `normalize_set`
-flatten them only for display.
+## Construction and module ownership
 
-## Key Types
+This is a dependency graph, not a chain in which every file only uses one layer.
 
-```ocaml
-type 'a set = 'a list
-type 'a set_arrow = { sa_src : 'a set; sa_fn : 'a -> 'a; sa_tgt : 'a set }
-type ('o, 'a) cat = { source : 'a -> 'o; target : 'a -> 'o; ident : 'o -> 'a; comp : 'a * 'a -> 'a }
-type 'a uf = { parent : int array; rank : int array; elems : 'a array }
-```
+| Owner (source/interface) | Responsibility |
+| --- | --- |
+| [Foundations.Category](src/foundations/category.ml) | Equality, checked composition, errors and opposites |
+| [Foundations.Functor](src/foundations/functor.ml) | General functor capabilities, identities, constants and composition |
+| [Universal.Diagrams](src/universal/diagrams.mli) | Admitted shapes, cones/cocones, morphisms and functor mapping |
+| [Universal.Limits](src/universal/limits.mli) | Primitive/chosen universals, one generic finite colimit and its dual; Free/Cofree |
+| [Universal.Preservation](src/universal/preservation.ml) | Continuity, cocontinuity and inverse-functor transport |
+| [Constructions.Elementary](src/constructions/elementary.ml) | One/product/slice/coslice categories; Twisted child |
+| [Constructions.Comma](src/constructions/comma.mli) | Admitted objects/squares, projections and inherited universals |
+| [Constructions.Functor_category](src/constructions/functor_category.mli) | Finite-domain functors/naturals and pointwise universals |
+| [Constructions.Indexed](src/constructions/indexed.mli) | Strict uniform-fiber inheritance |
+| [Constructions.Spans](src/constructions/spans.mli) | Witness-bearing composition via checked pullback |
+| [Instances.Finite_sets](src/instances/finite_sets.ml) | Equality-owned recursive values, sets and frozen arrows |
+| [Instances.Finite_set_universals.Make(F)](src/instances/finite_set_universals.ml) | Concrete limits/colimits and square preservation, sharing F |
+| [Instances.Finite_graphs](src/instances/finite_graphs.ml) | Multigraphs and inherited universals; Labelled/Rewriting children |
+| [Instances.Finite_relations.Make(F)](src/instances/finite_relations.mli) | Pair carriers and extensional images |
+| [Instances.Terms](src/instances/terms.mli) | Finite terms and frozen substitutions |
+| [Exercises.Basic](src/exercises/basic.ml) | Natural-number, tree, list, fold and monoid exercises |
 
-## Compilation
+The generic colimit follows the finite induction in the book (printed
+pp. 83–88). An empty discrete diagram uses the initial object. Adding a discrete
+node uses a coproduct and the universal map for the actual remaining subdiagram.
+Adding an edge coequalizes the two induced maps from its source into the prior
+apex. A commuting candidate cocone makes those maps equal after its induced map,
+so the coequalizer factors it. Uniqueness follows from the previous universal
+map and the primitive factorization's uniqueness. This is a construction
+argument under the supplied laws, not a machine-checked proof.
 
-Compile each module into a build directory (in dependency order), then link the tests:
+General limits reuse this construction in the opposite category, reversing
+shape endpoints and universal-arrow direction. Pushout and pullback use the
+shared three-node/two-edge diagrams; there is no second generic algorithm.
 
-```bash
-for m in core cat finite_sets universal graphs term_category colimits limits relations functors; do
-  ocamlc -w -a -I src -I _build -c src/$m.ml -o _build/$m.cmo
-done
+Span composition preserves distinct compatible witness pairs. Identity and
+associativity are compared **up to span isomorphism**, not equality of witness
+encodings. `Instances.Finite_relations.Make(F).image` deduplicates endpoint pairs separately
+without changing the span; an empty relation still retains its declared endpoints.
 
-ocamlc -w -a -I _build \
-  _build/core.cmo _build/cat.cmo _build/finite_sets.cmo _build/universal.cmo \
-  _build/graphs.cmo _build/term_category.cmo _build/colimits.cmo _build/limits.cmo \
-  _build/relations.cmo _build/functors.cmo \
-  tests/functional_test.ml -o _build/test_runner
-ocamlrun _build/test_runner
-```
+## Verification and limits
 
-Expected output:
+Tests are grouped by mathematical subject, not book chronology:
 
-```
-Running functional test suite...
-✓ Core (Ch2) passed
-✓ Categories & duality (Ch3) passed
-✓ Finite sets passed
-✓ Functors (Ch3.5) passed
-✓ Union-find coequalizer (Ch4.6) passed
-✓ Pushout construction (Ch4.7) passed
-✓ Limits via duality (Ch4.9) passed
+| Suite | Groups and selected evidence |
+| --- | --- |
+| [Foundations](tests/foundations_test.ml) | 5: exercises, admission, categories, terms, functors; 36 maps, 973 associativity triples |
+| [Universals](tests/universal_test.ml) | 8: primitives, diagrams, duality and failures; 6,110 maps, 1,020 primitive unique mediators; 461 FinSet diagrams, 5,350 mediators, 5,529 uniqueness cases, 351 larger equation-only cases; 39 Boolean diagrams, 100 mediators; 114 pullbacks |
+| [Spans and relations](tests/spans_relations_test.ml) | 7: 47 admissions, 803 pairs against an existential oracle, 15,625 associativity triples, 15,771 span isomorphisms |
+| [Category constructions and graphs](tests/constructions_test.ml) | 7: diagram maps, comma/elementary categories, multigraphs, labels and rewriting; 101 law triples |
+| [Functor categories](tests/functor_category_test.ml) | 4: admission, vertical/horizontal composition and pointwise universals; 551 natural admissions, 576,095 law triples, 3 selected exhaustive mediators |
+| [Indexed and free/cofree structures](tests/indexed_test.ml) | 2: inherited universals and fixed-shape adapters; 1,976 law triples, 2 selected exhaustive mediators |
 
-All functional tests passed successfully! ✓
-```
+Private test support owns assertion helpers, the shared bounded FinSet fixture,
+and one toy category. Independent universality, Boolean and relation oracles
+remain in their suites; production does not depend on test support.
 
-## Improvements Over the Original
+Additional regressions cover the book's five-class pushout (printed pp. 90–92)
+and four-witness relation composition; reordered enumerations, nonstructural
+atomic equality, nested values, empty objects, failed admission and propagated
+exceptions. Generic behavior is also exercised outside FinSet.
 
-| Aspect | Original | This refactor |
-|--------|----------|---------------|
-| Field access | `let (a,_,_,_) = ...` | `c.coprod_obj` |
-| Errors | `raise non_composable` | `(arrow, string) result` |
-| Arrow type | tuple constructor | named record |
-| Tags | exposed `blue(pink(...))` | hidden; normalized on display |
-| Layering | mixed | strictly layered |
-| Extension | edit types | add new modules |
+These are bounded checks. Diagram fixtures use up to three nodes and two edges
+over subsets of a two-atom set. FinSet mediator uniqueness enumeration is
+restricted to selected apex sizes at most four; larger derived colimit/limit
+apices (up to six/eight) receive equation checks, not exhaustive uniqueness
+search. Span associativity enumerates a fixed family of 25 endospans with
+derived witness carriers at most eight. Counts are evidence, not promised
+workload limits or an exhaustive proof of arbitrary inputs.
 
-## Limitations
+`tests/type_contracts/*.ml.txt` are separate manual compiler fixtures, **not**
+part of `dune runtest`. Both positive public consumers compile; ten negative
+fixtures must fail specifically for mixed equality universes, raw arrow
+records, private partition access, raw graph/span records, and raw comma,
+functor, natural-transformation, twisted-arrow and indexed records.
 
-The homogeneous `set_arrow` constraint (`'a -> 'a`) means the quotient object
-of a coequalizer (a set of equivalence classes, i.e. a set-of-sets) cannot be
-expressed cleanly as a `set_arrow` codomain. The implementation uses pragmatic
-`Obj.magic` casts to work around this; the mathematical structure is correct
-and the casts affect only type-level details, not runtime behavior. See the
-comments in `colimits.ml`, `limits.ml`, and `functors.ml`.
+No machine-checked proof, scalability target or production-readiness claim is made.
+The scope excludes completing all Chapter 2 exercises, Chapters 6–10, unchecked
+infinite-domain natural-transformation equality, a heterogeneous category library,
+full graph-grammar/regex compilation and package publication.
+
+## Local API migration
+
+This is the uncommitted local 0.1.0 mathematical-layout cutover, not a published
+compatibility release. The wrapped library name is unchanged; flat paths have
+no compatibility shims. Relative to the pre-layout working tree:
+
+| Retired owner | Current owner |
+| --- | --- |
+| Cat / Core | Foundations.Category / Exercises.Basic |
+| Universal / Abstract_limits | Universal.Limits; Free and Cofree children |
+| Graphs | Universal.Diagrams for admission/maps; Universal.Limits for chosen universals/algorithms |
+| Functors | Foundations.Functor for capabilities; Diagrams for mapping; Preservation for transport; Finite_set_universals.Make(F) for square operations |
+| Colimits.Make(F) / Limits.Make(F) | One Instances.Finite_set_universals.Make(F), sharing the same F |
+| Category_constructions / Twisted_arrows / Comma_categories | Constructions.Elementary / Elementary.Twisted / Comma |
+| Functor_categories / Indexed_categories | Constructions.Functor_category / Indexed |
+| Relations | Constructions.Spans; Instances.Finite_relations.Make(F) for relation admission/image |
+| Finite_sets / Finite_graphs / Term_category.TermCategory | Instances.Finite_sets / Finite_graphs / Terms |
+
+Use the fully qualified owners in the source table (all under
+Computational_category). The old Term_category.FiniteCategory toy belongs only
+to private test support; it is not a replacement public category instance.
+General theory must not import Instances. Supply lawful capabilities for the
+same category and use admitted builders, not raw records or casts. Preserve
+composition order, frozen maps, distinct equality universes and witness/image
+separation. Repository tests and both complete examples use the new paths.

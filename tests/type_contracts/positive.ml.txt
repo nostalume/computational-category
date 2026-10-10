@@ -1,0 +1,22 @@
+open Computational_category
+module Standard = struct type t = int let equal (a : int) b = a = b end
+module Magnitude = struct type t = int let equal a b = abs a = abs b end
+module F = Instances.Finite_sets.Make (Standard)
+module G = Instances.Finite_sets.Make (Magnitude)
+module C = Instances.Finite_set_universals.Make (F)
+let a = F.of_list [F.atom 1; F.atom 2]
+let b = G.of_list [G.atom 1; G.atom (-1)]
+let _ = F.seteq a a
+let _ = G.seteq b b
+let _ = C.set_coproduct (a, a)
+let _ = Universal.Diagrams.graph ~nodes:[] ~edges:[]
+module L = Instances.Finite_set_universals.Make (F)
+let generic_colimit = Universal.Limits.finite_colimit C.io_cp_ce_finset
+let generic_limit = Universal.Limits.dual_colimit (Universal.Limits.finite_colimit L.io_cp_ce_dual_finset)
+let generic_pushout = Universal.Limits.pushout C.cocomplete_finset
+let generic_pullback = Universal.Limits.pullback L.complete_finset
+module R = Instances.Finite_relations.Make (F)
+let identity_span = Constructions.Spans.identity F.cat a
+let relation = R.relation_span ~left:a ~right:a (F.cartesian_prod a a)
+let span_composition = Constructions.Spans.compose L.complete_finset
+let relation_image = R.image identity_span

@@ -1,3 +1,5 @@
+(include_subdirs qualified)
+
 (library
  (name computational_category)
  (public_name computational_category)
