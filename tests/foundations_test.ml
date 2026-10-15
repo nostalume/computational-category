@@ -39,11 +39,11 @@ let test_core () =
 exception Probe of int ref
 let test_sets () =
   check "deduplicate" (I.cardinality (ints [1;2;1]) = 2);
-  check "extensional objects" (I.seteq base (ints [2;1]));
-  check "set operations" (I.seteq (I.union (ints [1]) (ints [2;1])) base &&
-    I.seteq (I.inter base (ints [2])) (ints [2]) &&
-    I.seteq (I.diff base (ints [2])) (ints [1]));
-  check "image deduplication" (I.cardinality (I.mapset (fun _ -> v 1) base) = 1);
+  check "extensional objects" (I.equal_carrier base (ints [2;1]));
+  check "set operations" (I.equal_carrier (I.union (ints [1]) (ints [2;1])) base &&
+    I.equal_carrier (I.inter base (ints [2])) (ints [2]) &&
+    I.equal_carrier (I.diff base (ints [2])) (ints [1]));
+  check "image deduplication" (I.cardinality (I.map_carrier (fun _ -> v 1) base) = 1);
   check "powerset" (List.length objects = 4);
   let sum = I.disjoint_union base base in
   let nested = I.disjoint_union sum base in
@@ -54,41 +54,41 @@ let test_sets () =
     not (I.equal I.terminal (v 1)));
   List.iter (fun s ->
     let a,b = I.split s in
-    check "split preserves set" (I.seteq (I.union a b) s && I.is_empty (I.inter a b));
+    check "split preserves set" (I.equal_carrier (I.union a b) s && I.is_empty (I.inter a b));
     if I.cardinality s > 1 then
       check "split reduces" (I.cardinality a < I.cardinality s && I.cardinality b < I.cardinality s)
   ) (nested :: objects);
-  check "empty singleton split" (match I.singleton_split I.emptyset with None -> true | Some _ -> false);
+  check "empty singleton split" (match I.singleton_split I.empty with None -> true | Some _ -> false);
   let calls = ref 0 in
-  let f = get (I.arrow (ints [1;2;1]) (fun x -> incr calls; x) base) in
+  let f = get (I.morphism (ints [1;2;1]) (fun x -> incr calls; x) base) in
   check "sample each unique source once" (!calls = 2);
-  ignore (get (I.apply f (v 1))); ignore (get (I.compose (I.ident base) f));
-  check "arrow extensional equality" (I.equal_arrow f (I.ident (ints [2;1])));
+  ignore (get (I.eval f (v 1))); ignore (get (I.compose (I.identity base) f));
+  check "arrow extensional equality" (I.equal_morphism f (I.identity (ints [2;1])));
   check "callbacks not replayed" (!calls = 2);
-  endpoints "permuted composition" (composite (I.ident (ints [2;1])) f) base base;
+  endpoints "permuted composition" (composite (I.identity (ints [2;1])) f) base base;
   check "generic permuted composition" (arrow_eq
-    (get (Foundations.Category.compose I.cat (I.ident (ints [2;1])) f)) f);
-  reject "application outside source" outside (I.apply f (v 3));
+    (get (Foundations.Category.compose I.cat (I.identity (ints [2;1])) f)) f);
+  reject "application outside source" outside (I.eval f (v 3));
   reject "bad image" (function Foundations.Category.Outside_codomain _ -> true | _ -> false)
-    (I.arrow base (fun _ -> v 3) base);
-  reject "composition mismatch" noncomp (I.compose (I.ident (ints [3])) f);
+    (I.morphism base (fun _ -> v 3) base);
+  reject "composition mismatch" noncomp (I.compose (I.identity (ints [3])) f);
   let sentinel = ref 9 in
-  let threw = try ignore (I.arrow base (fun _ -> raise (Probe sentinel)) base); false
+  let threw = try ignore (I.morphism base (fun _ -> raise (Probe sentinel)) base); false
     with Probe p -> p == sentinel in
   check "callback exception unchanged" threw;
   let module E = Instances.Finite_sets.Make (struct type t = int let equal _ _ = raise (Probe sentinel) end) in
-  let threw = try ignore (E.arrow (E.singleton (E.atom 1)) (fun x -> x)
+  let threw = try ignore (E.morphism (E.singleton (E.atom 1)) (fun x -> x)
     (E.singleton (E.atom 1))); false with Probe p -> p == sentinel in
   check "equality exception unchanged" threw;
-  let absset = A.of_list [A.atom 1; A.atom (-1)] in
+  let absset = A.carrier_of_list [A.atom 1; A.atom (-1)] in
   check "instance equality" (A.cardinality absset = 1);
-  let af = get (A.arrow absset (fun _ -> A.atom 2) (A.singleton (A.atom (-2)))) in
-  check "equivalent query uses snapshot" (A.equal (get (A.apply af (A.atom (-1)))) (A.atom 2));
-  let ag = get (A.arrow absset (fun _ -> A.atom (-2)) (A.singleton (A.atom 2))) in
-  check "custom arrow equality" (A.equal_arrow af ag);
-  let e,_ = get (AU.set_equalizer (af,ag)) in
-  check "custom equalizer equality" (A.seteq e.Universal.Limits.eq_obj absset);
-  let ce,_ = get (AU.set_coequalizer (af,ag)) in
+  let af = get (A.morphism absset (fun _ -> A.atom 2) (A.singleton (A.atom (-2)))) in
+  check "equivalent query uses snapshot" (A.equal (get (A.eval af (A.atom (-1)))) (A.atom 2));
+  let ag = get (A.morphism absset (fun _ -> A.atom (-2)) (A.singleton (A.atom 2))) in
+  check "custom arrow equality" (A.equal_morphism af ag);
+  let e,_ = get (AU.equalizer (af,ag)) in
+  check "custom equalizer equality" (A.equal_carrier e.Universal.Limits.eq_obj absset);
+  let ce,_ = get (AU.coequalizer (af,ag)) in
   check "custom quotient equality" (A.cardinality ce.Universal.Limits.coeq_obj = 1);
   let throwing = { I.cat with Foundations.Category.comp = (fun _ -> raise (Probe sentinel)) } in
   let threw = try ignore (Foundations.Category.compose throwing f f); false with Probe p -> p == sentinel in
@@ -102,16 +102,16 @@ let test_categories () =
   check "finite map fixture count" (List.length arrows = 18);
   category_laws I.cat arrows;
   category_laws (Foundations.Category.dual_cat I.cat) arrows;
-  let plus_two = get (I.arrow base (fun x -> match I.view x with
+  let plus_two = get (I.morphism base (fun x -> match I.view x with
     | I.Atom n -> v (n+2) | _ -> assert false) (ints [3;4])) in
-  let times_ten = get (I.arrow (ints [3;4]) (fun x -> match I.view x with
+  let times_ten = get (I.morphism (ints [3;4]) (fun x -> match I.view x with
     | I.Atom n -> v (n*10) | _ -> assert false) (ints [10;20;30;40])) in
   check "composition arithmetic orientation"
-    (I.equal (get (I.apply (composite times_ten plus_two) (v 1))) (v 30));
+    (I.equal (get (I.eval (composite times_ten plus_two) (v 1))) (v 30));
   let open Category_test_support.Toy_category in
   category_laws cat [F;G;H;K;Id A;Id B;Id C];
   check "double dual" (Foundations.Category.has_endpoints (Foundations.Category.dual_cat (Foundations.Category.dual_cat I.cat))
-    (I.ident base) base base)
+    (I.identity base) base base)
 
 let test_terms () =
   let module T = Instances.Terms in
@@ -150,11 +150,11 @@ let functor_laws f arrows =
   List.iter (fun a ->
     let image = get (f.Foundations.Functor.f_amap a) in
     check "functor endpoints" (Foundations.Category.has_endpoints f.Foundations.Functor.f_cod image
-      (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.source a))
-      (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.target a)));
+      (get (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.source a)))
+      (get (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.target a))));
     check "functor identity" (f.Foundations.Functor.f_cod.Foundations.Category.equal_arr
       (get (f.Foundations.Functor.f_amap (f.Foundations.Functor.f_dom.Foundations.Category.ident (f.Foundations.Functor.f_dom.Foundations.Category.source a))))
-      (f.Foundations.Functor.f_cod.Foundations.Category.ident (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.source a)))))
+      (f.Foundations.Functor.f_cod.Foundations.Category.ident (get (f.Foundations.Functor.f_omap (f.Foundations.Functor.f_dom.Foundations.Category.source a))))))
     arrows;
   List.iter (fun a -> List.iter (fun b ->
     if f.Foundations.Functor.f_dom.Foundations.Category.equal_obj (f.Foundations.Functor.f_dom.Foundations.Category.target a)
@@ -171,11 +171,32 @@ let test_functors () =
   functor_laws U.product_functor arrows;
   functor_laws (Foundations.Functor.dual_functor U.product_functor) arrows;
   check "nested product functor" (I.cardinality
-    (U.product_functor.Foundations.Functor.f_omap (I.disjoint_union base base)) = 16);
+    (get (U.product_functor.Foundations.Functor.f_omap (I.disjoint_union base base))) = 16);
   let sum = I.disjoint_union base base in
   check "nested product functor identity" (arrow_eq
-    (get (U.product_functor.Foundations.Functor.f_amap (I.ident sum)))
-    (I.ident (U.product_functor.Foundations.Functor.f_omap sum)))
+    (get (U.product_functor.Foundations.Functor.f_amap (I.identity sum)))
+    (I.identity (get (U.product_functor.Foundations.Functor.f_omap sum))));
+  let module K = Foundations.Functor in
+  let id = K.id_functor I.cat in
+  functor_laws (K.compose U.product_functor id) arrows;
+  functor_laws (K.constant I.cat I.cat base) arrows;
+  let failure = Foundations.Category.Outside_domain "object construction" in
+  let first_calls = ref 0 and next_calls = ref 0 in
+  let failing = {id with K.f_omap=(fun _ -> incr first_calls; Error failure)} in
+  let next = {id with K.f_omap=(fun x -> incr next_calls; Ok x)} in
+  reject "composed object error unchanged" ((==) failure)
+    ((K.compose next failing).K.f_omap base);
+  check "object composition stops at first error" (!first_calls=1 && !next_calls=0);
+  reject "second object map error unchanged" ((==) failure)
+    ((K.compose failing next).K.f_omap base);
+  check "object maps sampled once per composition" (!first_calls=2 && !next_calls=1);
+  reject "dual object error unchanged" ((==) failure) ((K.dual_functor failing).K.f_omap base);
+  let sentinel = ref 13 in
+  let throwing = {id with K.f_omap=(fun _ -> raise (Probe sentinel))} in
+  List.iter (fun f ->
+    let threw = try ignore (f.K.f_omap base); false with Probe p -> p == sentinel in
+    check "composed object callback exception unchanged" threw)
+    [K.compose next throwing; K.compose throwing id]
 
 let () =
   List.iter (fun (name,test) -> test (); Printf.printf "PASS %s\n%!" name)

@@ -19,9 +19,9 @@ let product a b =
    comp=(fun ((g,h),(f,k)) ->
      let* x = compose a g f in let* y = compose b h k in Ok (x,y))}
 let first a b =
-  {Foundations.Functor.f_dom=product a b;f_cod=a;f_omap=fst;f_amap=(fun (f,_) -> Ok f)}
+  {Foundations.Functor.f_dom=product a b;f_cod=a;f_omap=(fun (x,_) -> Ok x);f_amap=(fun (f,_) -> Ok f)}
 let second a b =
-  {Foundations.Functor.f_dom=product a b;f_cod=b;f_omap=snd;f_amap=(fun (_,g) -> Ok g)}
+  {Foundations.Functor.f_dom=product a b;f_cod=b;f_omap=(fun (_,y) -> Ok y);f_amap=(fun (_,g) -> Ok g)}
 let cocomplete_product a b =
   let cat = product a.Universal.Limits.cc_cat b.Universal.Limits.cc_cat in
   let l = first a.Universal.Limits.cc_cat b.Universal.Limits.cc_cat in
@@ -55,6 +55,53 @@ let slice category anchor =
   Comma.category (Foundations.Functor.id_functor category) (Foundations.Functor.constant one category anchor)
 let coslice category anchor =
   Comma.category (Foundations.Functor.constant one category anchor) (Foundations.Functor.id_functor category)
+
+let initial_adjunction cat initial =
+  Universal.Adjunction.of_universal ~right:(Foundations.Functor.constant cat one ())
+    (fun () -> Ok {Universal.Adjunction.free_object=initial.Universal.Limits.init_obj;
+      unit_arrow=();factor=(fun o () -> initial.Universal.Limits.init_univ o)})
+
+(* Exercises 5/6 are couniversal choices. Build their right adjoints by the
+   one universal-arrow construction in opposite categories. *)
+let slice_postcompose complete h =
+  let cat = complete.Universal.Limits.co_cat in
+  let a = cat.source h and b = cat.target h in
+  let id = Foundations.Functor.id_functor cat in
+  let ka = Foundations.Functor.constant one cat a and kb = Foundations.Functor.constant one cat b in
+  let objects o =
+    let* link = compose cat h (Comma.connecting_arrow o) in
+    Comma.object_ id kb (Comma.left_object o) link () in
+  let sigma = {Foundations.Functor.f_dom=slice cat a;f_cod=slice cat b;f_omap=objects;
+    f_amap=(fun u -> let* s = objects (Comma.source u) in let* t = objects (Comma.target u) in
+      Comma.arrow id kb s (Comma.left_arrow u,()) t)} in
+  let choose v =
+    let* pb,factor = Universal.Limits.pullback complete (h,Comma.connecting_arrow v) in
+    let* free_object = Comma.object_ id ka pb.Universal.Limits.pullback_obj
+      pb.Universal.Limits.pullback_proj1 () in
+    let* image = objects free_object in
+    let* unit_arrow = Comma.arrow id kb image (pb.Universal.Limits.pullback_proj2,()) v in
+    let lift other u =
+      let* k = factor (Comma.left_object other) (Comma.connecting_arrow other) (Comma.left_arrow u) in
+      Comma.arrow id ka other (k,()) free_object in
+    Ok {Universal.Adjunction.free_object;unit_arrow;factor=lift} in
+  Universal.Adjunction.dual
+    (Universal.Adjunction.of_universal ~right:(Foundations.Functor.dual_functor sigma) choose)
+
+let slice_carrier cat product anchor =
+  let id = Foundations.Functor.id_functor cat in
+  let constant = Foundations.Functor.constant one cat anchor in
+  let forget = {Foundations.Functor.f_dom=slice cat anchor;f_cod=cat;
+    f_omap=(fun o -> Ok (Comma.left_object o));f_amap=(fun a -> Ok (Comma.left_arrow a))} in
+  let choose o =
+    let* p,factor = product (o,anchor) in
+    let* free_object = Comma.object_ id constant p.Universal.Limits.prod_obj
+      p.Universal.Limits.prod_proj2 () in
+    let lift other h =
+      let* k = factor (Comma.left_object other) h (Comma.connecting_arrow other) in
+      Comma.arrow id constant other (k,()) free_object in
+    Ok {Universal.Adjunction.free_object;unit_arrow=p.Universal.Limits.prod_proj1;factor=lift} in
+  Universal.Adjunction.dual
+    (Universal.Adjunction.of_universal ~right:(Foundations.Functor.dual_functor forget) choose)
 
 module Twisted : sig
   type 'a arrow

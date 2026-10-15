@@ -37,3 +37,59 @@ let transport_colimit forward backward colimit d =
       let* a = backward.f_amap (Diagrams.cocone_apex_arrow u) in
       Diagrams.cocone_arrow cocone a other in
     Ok {Limits.colim_cocone=cocone;colim_univ=univ}
+
+(* Proposition 9: transpose a candidate cocone, factor through the original
+   colimit, then transpose its mediator. Uniqueness uses the supplied adjunction
+   bijection and the original universal property, not another colimit search. *)
+let adjoint_cocontinuous adj =
+  let left = Adjunction.left adj and right = Adjunction.right adj in
+  let preserve colimit =
+    let open Foundations.Category in
+    let original = colimit.Limits.colim_cocone in
+    let base = Diagrams.cocone_base original in
+    let* mapped = Diagrams.map_cocone left original in
+    let univ other =
+      if not (Diagrams.same_base (Diagrams.cocone_base mapped) (Diagrams.cocone_base other)) then
+        Error (Different_base "adjoint colimit preservation")
+      else
+        let* image = Diagrams.map_cocone right other in
+        let* sides = traverse (fun n ->
+          let* o = Diagrams.node_object base n in
+          let* eta = natural_component (Adjunction.unit adj) o in
+          let* side = Diagrams.cocone_side image n in
+          let* leg = compose right.f_cod side eta in Ok (n,leg)) (Diagrams.diagram_nodes base) in
+        let* candidate = Diagrams.cocone base (Diagrams.cocone_apex image) ~sides in
+        let* u = colimit.Limits.colim_univ candidate in
+        let* factor = Adjunction.transpose adj (Diagrams.cocone_apex original)
+          (Diagrams.cocone_apex other) (Diagrams.cocone_apex_arrow u) in
+        Diagrams.cocone_arrow mapped factor other in
+    Ok {Limits.colim_cocone=mapped;colim_univ=univ} in
+  {cc_functor=left;cc_map=preserve}
+
+let adjoint_continuous adj =
+  let dual = adjoint_cocontinuous (Adjunction.dual adj) in
+  {ct_functor=Adjunction.right adj;
+   ct_map=(fun limit -> let open Foundations.Category in
+     let* c = dual.cc_map (Limits.dual_limiting limit) in Ok (Limits.dual_colimiting c))}
+
+(* Recompute the image colimit, then check its comparison map is invertible.
+   A failed comparison is not a preservation proof. This trades computation
+   for an explicit preservation implementation using existing universals. *)
+let by_comparison f target isomorphisms =
+  let preserve original =
+    let open Foundations.Category in
+    let* mapped = Diagrams.map_cocone f original.Limits.colim_cocone in
+    let* chosen = target.Limits.cc_colimit (Diagrams.cocone_base mapped) in
+    let* comparison = chosen.Limits.colim_univ mapped in
+    let* inverse = inverse isomorphisms (Diagrams.cocone_apex_arrow comparison) in
+    match inverse with
+    | None -> Error (Non_commuting "colimit comparison not invertible")
+    | Some inverse ->
+      let univ other =
+        if not (Diagrams.same_base (Diagrams.cocone_base mapped) (Diagrams.cocone_base other)) then
+          Error (Different_base "colimit comparison") else
+        let* u = chosen.Limits.colim_univ other in
+        let* h = compose f.f_cod (Diagrams.cocone_apex_arrow u) inverse in
+        Diagrams.cocone_arrow mapped h other in
+      Ok {Limits.colim_cocone=mapped;colim_univ=univ} in
+  {cc_functor=f;cc_map=preserve}

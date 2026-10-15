@@ -14,8 +14,9 @@ let target a = a.tgt
 let left_arrow a = a.left_map
 let right_arrow a = a.right_map
 let object_ l r left link right =
-  if has_endpoints l.Foundations.Functor.f_cod link
-      (l.Foundations.Functor.f_omap left) (r.Foundations.Functor.f_omap right) then
+  let* mapped_left = l.Foundations.Functor.f_omap left in
+  let* mapped_right = r.Foundations.Functor.f_omap right in
+  if has_endpoints l.Foundations.Functor.f_cod link mapped_left mapped_right then
     Ok {left;link;right}
   else Error (Non_composable "comma object: connecting endpoints")
 let equal_object l r a b =
@@ -51,10 +52,49 @@ let category l r =
   {source;target;ident;comp;equal_obj=equal_object l r;equal_arr}
 let left_projection l r =
   {Foundations.Functor.f_dom=category l r;f_cod=l.Foundations.Functor.f_dom;
-   f_omap=left_object;f_amap=(fun a -> Ok a.left_map)}
+   f_omap=(fun o -> Ok (left_object o));f_amap=(fun a -> Ok a.left_map)}
 let right_projection l r =
   {Foundations.Functor.f_dom=category l r;f_cod=r.Foundations.Functor.f_dom;
-   f_omap=right_object;f_amap=(fun a -> Ok a.right_map)}
+   f_omap=(fun o -> Ok (right_object o));f_amap=(fun a -> Ok a.right_map)}
+
+(* Exercise 1: J:(F,I_A)->(I_B,G) preserves both projections. Its inverse
+   replaces each connecting arrow by its adjoint transpose. *)
+let adjunction_forward adj =
+  let f = Universal.Adjunction.left adj and g = Universal.Adjunction.right adj in
+  let ia = Foundations.Functor.id_functor f.f_cod and ib = Foundations.Functor.id_functor f.f_dom in
+  let objects o =
+    let* h = Universal.Adjunction.untranspose adj o.left o.right o.link in
+    object_ ib g o.left h o.right in
+  {Foundations.Functor.f_dom=category f ia;f_cod=category ib g;f_omap=objects;
+   f_amap=(fun a -> let* s = objects a.src in let* t = objects a.tgt in
+     arrow ib g s (a.left_map,a.right_map) t)}
+let adjunction_backward adj =
+  let f = Universal.Adjunction.left adj and g = Universal.Adjunction.right adj in
+  let ia = Foundations.Functor.id_functor f.f_cod and ib = Foundations.Functor.id_functor f.f_dom in
+  let objects o =
+    let* h = Universal.Adjunction.transpose adj o.left o.right o.link in
+    object_ f ia o.left h o.right in
+  {Foundations.Functor.f_dom=category ib g;f_cod=category f ia;f_omap=objects;
+   f_amap=(fun a -> let* s = objects a.src in let* t = objects a.tgt in
+     arrow f ia s (a.left_map,a.right_map) t)}
+let adjunction_of_isomorphism ~left:f ~right:g ~forward ~backward =
+  let ia = Foundations.Functor.id_functor f.Foundations.Functor.f_cod in
+  let ib = Foundations.Functor.id_functor f.Foundations.Functor.f_dom in
+  let unit b =
+    let* fb = f.Foundations.Functor.f_omap b in
+    let* o = object_ f ia b (f.Foundations.Functor.f_cod.ident fb) fb in
+    let* image = forward.Foundations.Functor.f_omap o in
+    if f.Foundations.Functor.f_dom.equal_obj image.left b &&
+      f.Foundations.Functor.f_cod.equal_obj image.right fb then Ok image.link
+    else Error (Different_base "comma isomorphism: unit projections") in
+  let counit a =
+    let* ga = g.Foundations.Functor.f_omap a in
+    let* o = object_ ib g ga (g.Foundations.Functor.f_cod.ident ga) a in
+    let* image = backward.Foundations.Functor.f_omap o in
+    if f.Foundations.Functor.f_dom.equal_obj image.left ga &&
+      f.Foundations.Functor.f_cod.equal_obj image.right a then Ok image.link
+    else Error (Different_base "comma isomorphism: counit projections") in
+  Universal.Adjunction.of_unit_counit ~left:f ~right:g ~unit ~counit
 
 (* Component evidence is retained for actual downstream use, e.g. edge labels.
    The ordinary colimit API merely returns the first component. *)
@@ -108,11 +148,11 @@ let swap_arrow a = {src=swap_object a.tgt;tgt=swap_object a.src;
 let dual_to_swapped l r =
   {Foundations.Functor.f_dom=dual_cat (category l r);
    f_cod=category (Foundations.Functor.dual_functor r) (Foundations.Functor.dual_functor l);
-   f_omap=swap_object;f_amap=(fun a -> Ok (swap_arrow a))}
+   f_omap=(fun o -> Ok (swap_object o));f_amap=(fun a -> Ok (swap_arrow a))}
 let swapped_to_dual l r =
   {Foundations.Functor.f_dom=category (Foundations.Functor.dual_functor r) (Foundations.Functor.dual_functor l);
    f_cod=dual_cat (category l r);
-   f_omap=swap_object;f_amap=(fun a -> Ok (swap_arrow a))}
+   f_omap=(fun o -> Ok (swap_object o));f_amap=(fun a -> Ok (swap_arrow a))}
 let complete a b l cr =
   let r = cr.Universal.Preservation.ct_functor in
   let da = {Universal.Limits.cc_cat=dual_cat a.Universal.Limits.co_cat;
@@ -129,7 +169,7 @@ let complete a b l cr =
    coproducts: their universal construction is a pushout of the two links. *)
 let coslice_coproduct one underlying anchor (x,y) =
   let constant = {Foundations.Functor.f_dom=one;f_cod=underlying.Universal.Limits.cc_cat;
-    f_omap=(fun _ -> anchor);f_amap=(fun _ -> Ok (underlying.Universal.Limits.cc_cat.ident anchor))} in
+    f_omap=(fun _ -> Ok anchor);f_amap=(fun _ -> Ok (underlying.Universal.Limits.cc_cat.ident anchor))} in
   let id = Foundations.Functor.id_functor underlying.Universal.Limits.cc_cat in
   if not (underlying.Universal.Limits.cc_cat.equal_obj
     (underlying.Universal.Limits.cc_cat.source x.link) anchor &&

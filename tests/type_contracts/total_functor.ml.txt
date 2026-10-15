@@ -1,0 +1,4 @@
+open Computational_category
+let _ : (unit,unit,unit,unit) Foundations.Functor.cat_functor =
+  {f_dom=Constructions.Elementary.one;f_cod=Constructions.Elementary.one;
+   f_omap=(fun () -> ());f_amap=(fun () -> Ok ())}

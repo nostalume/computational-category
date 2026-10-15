@@ -2,7 +2,7 @@ open Computational_category
 module F = Instances.Finite_sets.Make (struct type t=int let equal (a:int) b=a=b end)
 module U = Instances.Finite_set_universals.Make (F)
 open Category_test_support.Checks
-let set xs = F.of_list (List.map F.atom xs)
+let set xs = F.carrier_of_list (List.map F.atom xs)
 module B = struct
   let cat = {Foundations.Category.source=fst;target=snd;ident=(fun x -> x,x);equal_obj=Bool.equal;
     equal_arr=(fun a b -> a=b);comp=(fun ((m,t),(s,n)) ->
@@ -31,13 +31,13 @@ end
 module I = struct
   type base_obj=bool
   type base_arr=bool*bool
-  type fiber_obj=F.set
-  type fiber_arr=F.arrow
+  type fiber_obj=F.carrier
+  type fiber_arr=F.morphism
   let base=B.cat
   let fiber _=F.cat
   let valid_object _ _=true
-  let zero={Foundations.Functor.f_dom=F.cat;f_cod=F.cat;f_omap=(fun _ -> F.emptyset);
-    f_amap=(fun _ -> Ok (F.ident F.emptyset))}
+  let zero={Foundations.Functor.f_dom=F.cat;f_cod=F.cat;f_omap=(fun _ -> Ok F.empty);
+    f_amap=(fun _ -> Ok (F.identity F.empty))}
   let transport (s,t)=
     if s=t then Ok (Foundations.Functor.id_functor F.cat)
     else if not s && t then Ok zero else Error (Foundations.Category.Non_composable "transport")
@@ -45,14 +45,14 @@ end
 module G = Constructions.Indexed.Make (I)
 module Checked = Constructions.Indexed.Make (struct
   include I
-  let valid_object i s=i || List.for_all (fun x -> F.member x (set [1;2])) (F.to_list s)
+  let valid_object i s=i || List.for_all (fun x -> F.mem x (set [1;2])) (F.carrier_to_list s)
 end)
 let preserve base c =
   if fst base=snd base then Ok c else
     let open Foundations.Category in
     let* cc=Universal.Diagrams.map_cocone I.zero c.Universal.Limits.colim_cocone in
     let univ other=
-      let* a=F.arrow_result F.emptyset (fun _ -> Error (Outside_domain "empty"))
+      let* a=F.morphism_result F.empty (fun _ -> Error (Outside_domain "empty"))
         (Universal.Diagrams.cocone_apex other) in Universal.Diagrams.cocone_arrow cc a other in
     Ok {Universal.Limits.colim_cocone=cc;colim_univ=univ}
 let adjoints base =
@@ -60,31 +60,31 @@ let adjoints base =
     to_right=(fun _ _ h -> Ok h);from_right=(fun _ _ h -> Ok h)}
   else if not (fst base) && snd base then
     let terminal=F.singleton F.terminal in
-    let right={Foundations.Functor.f_dom=F.cat;f_cod=F.cat;f_omap=(fun _ -> terminal);
-      f_amap=(fun _ -> Ok (F.ident terminal))} in
-    Ok {G.right;to_right=(fun a _ _ -> F.arrow a (fun _ -> F.terminal) terminal);
-      from_right=(fun _ b _ -> F.arrow_result F.emptyset
+    let right={Foundations.Functor.f_dom=F.cat;f_cod=F.cat;f_omap=(fun _ -> Ok terminal);
+      f_amap=(fun _ -> Ok (F.identity terminal))} in
+    Ok {G.right;to_right=(fun a _ _ -> F.morphism a (fun _ -> F.terminal) terminal);
+      from_right=(fun _ b _ -> F.morphism_result F.empty
         (fun _ -> Error (Foundations.Category.Outside_domain "empty")) b)}
   else Error (Foundations.Category.Non_composable "adjoint")
 let cc=G.cocomplete B.cc (fun _ -> U.cocomplete_finset) preserve
 let lc=G.complete B.lc (fun _ -> U.complete_finset) adjoints
 let obj i s=get (G.object_ i s)
-let arr a b h c=get (G.arrow a b h c)
+let arr a b h c=get (G.indexed_morphism a b h c)
 let triples=ref 0
 let mediator_checks=ref 0
 let all_maps a b =
   let rec assignments xs=match xs with
     | [] -> [[]] | x::xs -> List.concat_map (fun y ->
-      List.map (fun rest -> (x,y)::rest) (assignments xs)) (F.to_list b) in
-  List.map (fun xs -> get (F.arrow_result a (fun x ->
+      List.map (fun rest -> (x,y)::rest) (assignments xs)) (F.carrier_to_list b) in
+  List.map (fun xs -> get (F.morphism_result a (fun x ->
     match List.find_opt (fun (y,_) -> F.equal x y) xs with
     | Some (_,y) -> Ok y | None -> Error (Foundations.Category.Outside_domain "oracle")) b))
-    (assignments (F.to_list a))
+    (assignments (F.carrier_to_list a))
 let all_arrows a b =
   let base=G.index a,G.index b in
   if fst base && not (snd base) then [] else
     let f=get (I.transport base) in
-    List.map (fun h -> arr a base h b) (all_maps (f.Foundations.Functor.f_omap (G.value a)) (G.value b))
+    List.map (fun h -> arr a base h b) (all_maps (get (f.Foundations.Functor.f_omap (G.value a))) (G.value b))
 let laws arrows =
   let cp g f=get (Foundations.Category.compose G.category g f) in
   List.iter (fun f ->
@@ -98,14 +98,44 @@ let laws arrows =
           (cp h (cp g f)) (cp (cp h g) f))
       end) arrows) arrows) arrows
 let test_indexed () =
+  let failure=Foundations.Category.Outside_domain "indexed object construction" in
+  let module Bad = Constructions.Indexed.Make (struct
+    include I
+    let transport _ = Ok {I.zero with Foundations.Functor.f_omap=(fun _ -> Error failure)}
+  end) in
+  let ba=get (Bad.object_ false (set [1])) in
+  reject "indexed object mapping failure unchanged" ((==) failure)
+    (Bad.indexed_morphism ba (false,false) (F.identity (set [1])) ba);
+  let single=get (Universal.Diagrams.graph ~nodes:["a"] ~edges:[]) in
+  let bd=get (Universal.Diagrams.diagram Bad.category single ~objects:["a",ba] ~arrows:[]) in
+  reject "indexed colimit object failure unchanged" ((==) failure)
+    ((Bad.cocomplete B.cc (fun _ -> U.cocomplete_finset) preserve).Universal.Limits.cc_colimit bd);
+  let right={Foundations.Functor.(id_functor F.cat) with
+    Foundations.Functor.f_omap=(fun _ -> Error failure)} in
+  let adj={G.right;to_right=(fun _ _ _ -> assert false);from_right=(fun _ _ _ -> assert false)} in
+  reject "indexed transpose right object failure unchanged" ((==) failure)
+    (G.transpose (false,false) adj (set [1]) (set [1]) (F.identity (set [1])));
+  reject "indexed untranspose right object failure unchanged" ((==) failure)
+    (G.untranspose (false,false) adj (set [1]) (set [1]) (F.identity (set [1])));
+  let bad_adj={Bad.right=Foundations.Functor.id_functor F.cat;
+    to_right=(fun _ _ _ -> assert false);from_right=(fun _ _ _ -> assert false)} in
+  reject "indexed transpose left object failure unchanged" ((==) failure)
+    (Bad.transpose (false,false) bad_adj (set [1]) (set [1]) (F.identity (set [1])));
+  reject "indexed untranspose left object failure unchanged" ((==) failure)
+    (Bad.untranspose (false,false) bad_adj (set [1]) (set [1]) (F.identity (set [1])));
+  let bad_adjoints f=let a=get (adjoints f) in Ok {a with G.right} in
+  let ga=get (G.object_ false (set [1])) in
+  let gd=get (Universal.Diagrams.diagram G.category single ~objects:["a",ga] ~arrows:[]) in
+  reject "indexed limit object failure unchanged" ((==) failure)
+    ((G.complete B.lc (fun _ -> U.complete_finset) bad_adjoints).Universal.Limits.co_limit gd);
   reject_any "indexed object fiber membership" (Checked.object_ false (set [3]));
   ignore (get (Checked.object_ true (set [3])));
   let objects=List.concat_map (fun i -> List.map (obj i) (F.powerset (set [1;2]))) [false;true] in
   laws (List.concat_map (fun a -> List.concat_map (all_arrows a) objects) objects);
   let x=obj false (set [1;2]) and y=obj true (set [1;2]) in
-  let h=arr x (false,true) (get (F.arrow_result F.emptyset
+  let h=arr x (false,true) (get (F.morphism_result F.empty
     (fun _ -> Error (Foundations.Category.Outside_domain "empty")) (G.value y))) y in
-  reject_any "fiber endpoints" (G.arrow x (false,true) (F.ident (G.value x)) y);
+  reject_any "fiber endpoints" (G.indexed_morphism x (false,true) (F.identity (G.value x)) y);
   let shape=get (Universal.Diagrams.graph ~nodes:["x";"y"] ~edges:["h","x","y"]) in
   let d=get (Universal.Diagrams.diagram G.category shape ~objects:["x",x;"y",y] ~arrows:["h",h]) in
   let c=get (cc.Universal.Limits.cc_colimit d) and l=get (lc.Universal.Limits.co_limit d) in
@@ -125,7 +155,7 @@ let test_indexed () =
   let bad_preserve _ c=Ok c in
   let bad=get ((G.cocomplete B.cc (fun _ -> U.cocomplete_finset) bad_preserve).Universal.Limits.cc_colimit one) in
   reject_any "preservation wrong fiber" (bad.Universal.Limits.colim_univ candidate);
-  let ay=arr y (true,true) (get (F.arrow (G.value y) (fun _ -> F.atom 1) (G.value y))) y in
+  let ay=arr y (true,true) (get (F.morphism (G.value y) (fun _ -> F.atom 1) (G.value y))) y in
   let by=get (Foundations.Category.compose G.category ay h) in
   let other=get (Universal.Diagrams.cocone d y ~sides:["x",by;"y",ay]) in
   let factor=get (c.Universal.Limits.colim_univ other) in
@@ -136,7 +166,7 @@ let test_indexed () =
   incr mediator_checks;
   check "indexed colimit unique" (List.length candidates=1 &&
     G.category.Foundations.Category.equal_arr (List.hd candidates) (Universal.Diagrams.cocone_apex_arrow factor));
-  let ax=arr x (false,false) (get (F.arrow (G.value x) (fun _ -> F.atom 1) (G.value x))) x in
+  let ax=arr x (false,false) (get (F.morphism (G.value x) (fun _ -> F.atom 1) (G.value x))) x in
   let bx=get (Foundations.Category.compose G.category h ax) in
   let other=get (Universal.Diagrams.cone d x ~sides:["x",ax;"y",bx]) in
   let factor=get (l.Universal.Limits.lim_univ other) in
@@ -161,25 +191,25 @@ let test_abstract () =
   let a=set [1] and b=set [1;2] in
   let d=get (Universal.Diagrams.diagram F.cat shape ~objects:["a",a] ~arrows:[]) in
   let e=get (Universal.Diagrams.diagram F.cat shape ~objects:["a",b] ~arrows:[]) in
-  let injection=get (F.arrow a (fun x -> x) b) in
+  let injection=get (F.morphism a (fun x -> x) b) in
   let base=get (Universal.Diagrams.diagram_arrow d e ~components:["a",injection]) in
-  let c=Universal.Limits.Free.fixed_colimit F.cat shape U.set_colimit in
+  let c=Universal.Limits.Free.fixed_colimit F.cat shape U.colimit in
   let free,unit,factor=get (c.Universal.Limits.Free.free d) in
-  let other=get (Universal.Diagrams.cocone e b ~sides:["a",F.ident b]) in
+  let other=get (Universal.Diagrams.cocone e b ~sides:["a",F.identity b]) in
   let arrow=get (factor other base) in
   check "abstract free base" (c.Universal.Limits.Free.diagrams.Foundations.Category.equal_arr
     (get (Foundations.Category.compose c.Universal.Limits.Free.diagrams (c.Universal.Limits.Free.base_arrow arrow) unit)) base);
-  check "abstract free triangle" (F.equal_arrow (get (F.compose
+  check "abstract free triangle" (F.equal_morphism (get (F.compose
     (Universal.Diagrams.cocone_map_apex arrow) (get (Universal.Diagrams.cocone_side free "a")))) injection);
   let self=get (factor free unit) in
   check "free identity" (c.Universal.Limits.Free.cocones.Foundations.Category.equal_arr self (c.Universal.Limits.Free.cocones.Foundations.Category.ident free));
-  let l=Universal.Limits.Cofree.fixed_limit F.cat shape U.set_limit in
+  let l=Universal.Limits.Cofree.fixed_limit F.cat shape U.limit in
   let cofree,counit,factor=get (l.Universal.Limits.Cofree.cofree e) in
-  let other=get (Universal.Diagrams.cone d a ~sides:["a",F.ident a]) in
+  let other=get (Universal.Diagrams.cone d a ~sides:["a",F.identity a]) in
   let arrow=get (factor other base) in
   check "abstract cofree base" (l.Universal.Limits.Cofree.limit_diagrams.Foundations.Category.equal_arr
     (get (Foundations.Category.compose l.Universal.Limits.Cofree.limit_diagrams counit (l.Universal.Limits.Cofree.cone_base_arrow arrow))) base);
-  check "abstract cofree triangle" (F.equal_arrow (get (F.compose
+  check "abstract cofree triangle" (F.equal_morphism (get (F.compose
     (get (Universal.Diagrams.cone_side cofree "a")) (Universal.Diagrams.cone_map_apex arrow))) injection)
 let () =
   List.iter (fun (name,test) -> test ();Printf.printf "PASS %s\n%!" name)

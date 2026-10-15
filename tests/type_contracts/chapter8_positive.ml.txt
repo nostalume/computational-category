@@ -1,0 +1,14 @@
+open Computational_category
+module U = Instances.Term_unification
+
+let () =
+  match U.symbol "f" ["x"] with
+  | Error _ -> failwith "symbol"
+  | Ok f ->
+      let x = U.variable "x" in
+      (match U.application f ["x", x] with
+       | Error _ -> failwith "application"
+       | Ok fx ->
+           match U.unify [fx, fx] with
+           | Error _ -> failwith "unify"
+           | Ok substitution -> ignore (U.image substitution "x"))

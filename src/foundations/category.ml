@@ -11,6 +11,7 @@ type error =
   | Malformed_relation of string
   | Different_base of string
   | Non_commuting of string
+  | Iteration_limit of int
 
 let ( let* ) r f = match r with Ok x -> f x | Error e -> Error e
 
@@ -42,3 +43,22 @@ let has_endpoints c a source target =
 let dual_cat c =
   { c with source = c.target; target = c.source;
            comp = (fun (g, f) -> c.comp (f, g)) }
+
+(* A recognizer supplies None for a non-isomorphism. Proposed inverses are
+   checked in both directions; recognition must itself be lawful and stable. *)
+type ('o,'a) iso_cat = {
+  iso_cat : ('o,'a) cat;
+  iso_inverse : 'a -> ('a option,error) result;
+}
+let inverse iso h =
+  let* candidate = iso.iso_inverse h in
+  match candidate with
+  | None -> Ok None
+  | Some k ->
+    let c = iso.iso_cat in
+    if not (has_endpoints c k (c.target h) (c.source h)) then
+      Error (Non_composable "inverse endpoints")
+    else
+      let* kh = compose c k h in let* hk = compose c h k in
+      if c.equal_arr kh (c.ident (c.source h)) && c.equal_arr hk (c.ident (c.target h))
+      then Ok (Some k) else Error (Non_commuting "inverse equations")

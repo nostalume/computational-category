@@ -46,7 +46,7 @@ let same_domain a b =
     List.for_all (fun y -> List.exists (eq y) xs) ys in
   same a.cat.equal_obj a.objects b.objects && same a.cat.equal_arr a.arrows b.arrows
 
-type ('oa,'aa,'ob,'ab) functor_ = {
+type ('oa,'aa,'ob,'ab) finite_functor = {
   domain:('oa,'aa) domain;codomain:('ob,'ab) cat;
   object_entries:('oa * 'ob) list;arrow_entries:('aa * 'ab) list;
 }
@@ -58,7 +58,7 @@ let equal_functor f g =
     | Ok y -> f.codomain.equal_obj x y | Error _ -> false) f.object_entries &&
   List.for_all (fun (a,x) -> match arrow_map g a with
     | Ok y -> f.codomain.equal_arr x y | Error _ -> false) f.arrow_entries
-let functor_ domain codomain ~objects:omap ~arrows:amap =
+let finite_functor domain codomain ~objects:omap ~arrows:amap =
   let* object_entries = traverse (fun o -> let* x = omap o in Ok (o,x)) domain.objects in
   let* arrow_entries = traverse (fun a -> let* x = amap a in Ok (a,x)) domain.arrows in
   let f = {domain;codomain;object_entries;arrow_entries} in
@@ -86,16 +86,16 @@ let identity_functor domain =
    object_entries=List.map (fun o -> o,o) domain.objects;
    arrow_entries=List.map (fun a -> a,a) domain.arrows}
 let constant_functor domain target object_ =
-  functor_ domain target ~objects:(fun _ -> Ok object_)
+  finite_functor domain target ~objects:(fun _ -> Ok object_)
     ~arrows:(fun _ -> Ok (target.ident object_))
-type ('oa,'aa,'ob,'ab) natural = {
-  src:('oa,'aa,'ob,'ab) functor_;tgt:('oa,'aa,'ob,'ab) functor_;
+type ('oa,'aa,'ob,'ab) natural_transformation = {
+  src:('oa,'aa,'ob,'ab) finite_functor;tgt:('oa,'aa,'ob,'ab) finite_functor;
   components:('oa * 'ab) list;
 }
 let source a = a.src
 let target a = a.tgt
 let component a = lookup a.src.domain.cat.equal_obj "natural component" a.components
-let natural src tgt components =
+let natural_transformation src tgt components =
   if not (same_domain src.domain tgt.domain) then
     Error (Different_base "natural transformation: source categories")
   else
@@ -112,7 +112,7 @@ let natural src tgt components =
       if src.codomain.equal_arr left right then Ok ()
       else Error (Non_commuting "naturality square")) src.domain.arrows in
     Ok result
-let equal_natural a b =
+let equal_natural_transformation a b =
   equal_functor a.src b.src && equal_functor a.tgt b.tgt &&
   List.for_all (fun (o,x) -> match component b o with
     | Ok y -> a.src.codomain.equal_arr x y | Error _ -> false) a.components
@@ -121,32 +121,32 @@ let category _domain target =
     components=List.map (fun (o,x) -> o,target.ident x) f.object_entries} in
   let comp (g,f) =
     if not (equal_functor f.tgt g.src) then Error (Non_composable "vertical composition")
-    else natural f.src g.tgt (fun o ->
+    else natural_transformation f.src g.tgt (fun o ->
       let* a = component f o in let* b = component g o in compose target b a) in
-  {source;target=(fun a -> a.tgt);ident;comp;equal_obj=equal_functor;equal_arr=equal_natural}
+  {source;target=(fun a -> a.tgt);ident;comp;equal_obj=equal_functor;equal_arr=equal_natural_transformation}
 (* The diagonal C -> C^J needs no sampling of arbitrary object callbacks:
    its maps are defined from admitted J and the supplied lawful C dictionary. *)
 let diagonal domain target =
   let object_fn o = {domain;codomain=target;
     object_entries=List.map (fun a -> a,o) domain.objects;
     arrow_entries=List.map (fun a -> a,target.ident o) domain.arrows} in
-  {Foundations.Functor.f_dom=target;f_cod=category domain target;f_omap=object_fn;
-   f_amap=(fun h -> natural (object_fn (target.source h))
+  {Foundations.Functor.f_dom=target;f_cod=category domain target;f_omap=(fun o -> Ok (object_fn o));
+   f_amap=(fun h -> natural_transformation (object_fn (target.source h))
      (object_fn (target.target h)) (fun _ -> Ok h))}
 let compose_functors g f =
-  functor_ f.domain g.codomain ~objects:(fun o ->
+  finite_functor f.domain g.codomain ~objects:(fun o ->
     let* x = object_map f o in object_map g x) ~arrows:(fun a ->
     let* x = arrow_map f a in arrow_map g x)
 let horizontal beta alpha =
   let* src = compose_functors beta.src alpha.src in
   let* tgt = compose_functors beta.tgt alpha.tgt in
-  natural src tgt (fun a ->
+  natural_transformation src tgt (fun a ->
     let* fa = object_map alpha.tgt a in let* b = component beta fa in
     let* aa = component alpha a in let* ga = arrow_map beta.src aa in
     compose beta.src.codomain b ga)
 let dual_domain d = {d with cat=dual_cat d.cat}
 let dual_functor f = {f with domain=dual_domain f.domain;codomain=dual_cat f.codomain}
-let dual_natural a = {src=dual_functor a.tgt;tgt=dual_functor a.src;components=a.components}
+let dual_natural_transformation a = {src=dual_functor a.tgt;tgt=dual_functor a.src;components=a.components}
 
 let evaluate_diagram target d object_ =
   let* objects = traverse (fun n ->
@@ -164,7 +164,7 @@ let cocomplete domain target =
       let* evaluated = evaluate_diagram target.Universal.Limits.cc_cat d o in
       let* c = target.Universal.Limits.cc_colimit evaluated in Ok (o,c)) domain.objects in
     let point = lookup domain.cat.equal_obj "pointwise colimit object" cached in
-    let* apex = functor_ domain target.Universal.Limits.cc_cat ~objects:(fun o ->
+    let* apex = finite_functor domain target.Universal.Limits.cc_cat ~objects:(fun o ->
       let* c = point o in Ok (Universal.Diagrams.cocone_apex c.Universal.Limits.colim_cocone))
       ~arrows:(fun f ->
         let* s = point (domain.cat.source f) in let* t = point (domain.cat.target f) in
@@ -178,12 +178,12 @@ let cocomplete domain target =
         let* u = s.Universal.Limits.colim_univ other in Ok (Universal.Diagrams.cocone_apex_arrow u)) in
     let* sides = traverse (fun n ->
       let* f = Universal.Diagrams.node_object d n in
-      let* a = natural f apex (fun o ->
+      let* a = natural_transformation f apex (fun o ->
         let* c = point o in Universal.Diagrams.cocone_side c.Universal.Limits.colim_cocone n) in Ok (n,a))
       (Universal.Diagrams.diagram_nodes d) in
     let* result = Universal.Diagrams.cocone d apex ~sides in
     let univ other =
-      let* a = natural apex (Universal.Diagrams.cocone_apex other) (fun o ->
+      let* a = natural_transformation apex (Universal.Diagrams.cocone_apex other) (fun o ->
         let* c = point o in
         let* target_obj = object_map (Universal.Diagrams.cocone_apex other) o in
         let* sides = traverse (fun n ->
@@ -200,8 +200,8 @@ let complete domain target =
   let dual = cocomplete (dual_domain domain) opposite in
   let ordinary = category domain target.Universal.Limits.co_cat in
   let forward = {Foundations.Functor.f_dom=dual_cat ordinary;f_cod=dual.Universal.Limits.cc_cat;
-    f_omap=dual_functor;f_amap=(fun a -> Ok (dual_natural a))} in
+    f_omap=(fun f -> Ok (dual_functor f));f_amap=(fun a -> Ok (dual_natural_transformation a))} in
   let backward = {Foundations.Functor.f_dom=dual.Universal.Limits.cc_cat;f_cod=dual_cat ordinary;
-    f_omap=dual_functor;f_amap=(fun a -> Ok (dual_natural a))} in
+    f_omap=(fun f -> Ok (dual_functor f));f_amap=(fun a -> Ok (dual_natural_transformation a))} in
   {Universal.Limits.co_cat=ordinary;co_limit=Universal.Limits.dual_colimit
     (Universal.Preservation.transport_colimit forward backward dual.Universal.Limits.cc_colimit)}

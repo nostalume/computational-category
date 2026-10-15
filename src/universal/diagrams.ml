@@ -332,21 +332,23 @@ open Foundations.Functor
 let map_diagram f d =
   let open Foundations.Category in
   let* objects = traverse (fun n ->
-    let* o = node_object d n in Ok (n,f.f_omap o)) (diagram_nodes d) in
+    let* o = node_object d n in let* image = f.f_omap o in Ok (n,image)) (diagram_nodes d) in
   let* arrows = traverse (fun e ->
     let* a = edge_arrow d e in let* b = f.f_amap a in Ok (e,b))
     (diagram_edges d) in
   diagram f.f_cod (diagram_graph d) ~objects ~arrows
 let map_cocone f c =
   let open Foundations.Category in let* base = map_diagram f (cocone_base c) in
+  let* apex = f.f_omap (cocone_apex c) in
   let* sides = traverse (fun n ->
     let* a = cocone_side c n in let* b = f.f_amap a in Ok (n,b))
     (diagram_nodes (cocone_base c)) in
-  cocone base (f.f_omap (cocone_apex c)) ~sides
+  cocone base apex ~sides
 let map_cone f c =
   let open Foundations.Category in let* base = map_diagram f (cone_base c) in
+  let* apex = f.f_omap (cone_apex c) in
   let* sides = traverse (fun n ->
     let* a = cone_side c n in let* b = f.f_amap a in Ok (n,b))
     (diagram_nodes (cone_base c)) in
-  cone base (f.f_omap (cone_apex c)) ~sides
+  cone base apex ~sides
 

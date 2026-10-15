@@ -16,16 +16,16 @@ module Primitives = struct
 
   let test_universals () =
     List.iter (fun x ->
-      let i = get (U.set_initial.Universal.Limits.init_univ x) in
-      endpoints "initial endpoints" i I.emptyset x;
-      unique "initial" (all_maps I.emptyset x) i (fun _ -> true);
-      let t = get (U.set_terminal.Universal.Limits.term_univ x) in
-      endpoints "terminal endpoints" t x U.set_terminal.Universal.Limits.term_obj;
-      unique "terminal" (all_maps x U.set_terminal.Universal.Limits.term_obj) t (fun _ -> true)
+      let i = get (U.initial.Universal.Limits.init_univ x) in
+      endpoints "initial endpoints" i I.empty x;
+      unique "initial" (all_maps I.empty x) i (fun _ -> true);
+      let t = get (U.terminal.Universal.Limits.term_univ x) in
+      endpoints "terminal endpoints" t x U.terminal.Universal.Limits.term_obj;
+      unique "terminal" (all_maps x U.terminal.Universal.Limits.term_obj) t (fun _ -> true)
     ) objects;
     List.iter (fun a -> List.iter (fun b ->
-      let cp, fold = get (U.set_coproduct (a,b)) in
-      let pr, pair = get (U.set_product (a,b)) in
+      let cp, fold = get (U.coproduct (a,b)) in
+      let pr, pair = get (U.product (a,b)) in
       endpoints "coproduct leg 1" cp.Universal.Limits.coprod_inj1 a cp.Universal.Limits.coprod_obj;
       endpoints "coproduct leg 2" cp.Universal.Limits.coprod_inj2 b cp.Universal.Limits.coprod_obj;
       endpoints "product leg 1" pr.Universal.Limits.prod_proj1 pr.Universal.Limits.prod_obj a;
@@ -48,22 +48,22 @@ module Primitives = struct
       ) objects;
       let arrows = all_maps a b in
       List.iter (fun f -> List.iter (fun g ->
-        let ce, factor = get (U.set_coequalizer (f,g)) in
-        let eq, lift = get (U.set_equalizer (f,g)) in
+        let ce, factor = get (U.coequalizer (f,g)) in
+        let eq, lift = get (U.equalizer (f,g)) in
         let q = ce.Universal.Limits.coeq_arrow and e = eq.Universal.Limits.eq_arrow in
         endpoints "quotient endpoints" q b ce.Universal.Limits.coeq_obj;
         endpoints "equalizer endpoints" e eq.Universal.Limits.eq_obj a;
         check "quotient equation" (arrow_eq (composite q f) (composite q g));
         check "equalizer equation" (arrow_eq (composite f e) (composite g e));
-        let classes = get (U.set_coequalizer_classes (f,g)) in
-        check "classes cover target" (I.seteq (List.fold_left I.union I.emptyset classes) b);
+        let classes = get (U.coequalizer_classes (f,g)) in
+        check "classes cover target" (I.equal_carrier (List.fold_left I.union I.empty classes) b);
         List.iter (fun cls ->
           check "nonempty class" (not (I.is_empty cls));
-          List.iter (fun other -> if not (I.seteq cls other) then
+          List.iter (fun other -> if not (I.equal_carrier cls other) then
             check "disjoint classes" (I.is_empty (I.inter cls other))) classes) classes;
         check "representatives stay in target" (I.is_empty (I.diff ce.Universal.Limits.coeq_obj b));
-        check "quotient surjectivity" (I.seteq
-          (I.mapset (fun x -> get (I.apply q x)) b) ce.Universal.Limits.coeq_obj);
+        check "quotient surjectivity" (I.equal_carrier
+          (I.map_carrier (fun x -> get (I.eval q x)) b) ce.Universal.Limits.coeq_obj);
         List.iter (fun x ->
           List.iter (fun h ->
             if arrow_eq (composite h f) (composite h g) then begin
@@ -85,62 +85,62 @@ module Primitives = struct
       ) arrows) arrows
     ) objects) objects;
     let singleton = ints [1] in
-    let wrong = I.ident (ints [3]) in
-    let cp,fold = get (U.set_coproduct (singleton,base)) in
-    reject "coproduct mediator endpoints" noncomp (fold base wrong (I.ident base));
+    let wrong = I.identity (ints [3]) in
+    let cp,fold = get (U.coproduct (singleton,base)) in
+    reject "coproduct mediator endpoints" noncomp (fold base wrong (I.identity base));
     reject "coproduct mediator target" noncomp
-      (fold base (I.ident singleton) (I.ident base));
-    let _,pair = get (U.set_product (singleton,base)) in
-    reject "product mediator endpoints" noncomp (pair base wrong (I.ident base));
-    reject "nonparallel coequalizer" nonparallel (U.set_coequalizer (wrong,I.ident base));
-    reject "nonparallel equalizer" nonparallel (U.set_equalizer (wrong,I.ident base));
-    let different_source = get (I.arrow singleton (fun _ -> v 1) base) in
-    let different_target = get (I.arrow base (fun _ -> v 1) singleton) in
+      (fold base (I.identity singleton) (I.identity base));
+    let _,pair = get (U.product (singleton,base)) in
+    reject "product mediator endpoints" noncomp (pair base wrong (I.identity base));
+    reject "nonparallel coequalizer" nonparallel (U.coequalizer (wrong,I.identity base));
+    reject "nonparallel equalizer" nonparallel (U.equalizer (wrong,I.identity base));
+    let different_source = get (I.morphism singleton (fun _ -> v 1) base) in
+    let different_target = get (I.morphism base (fun _ -> v 1) singleton) in
     List.iter (fun other ->
       reject "coequalizer parallel endpoint" nonparallel
-        (U.set_coequalizer (I.ident base,other));
+        (U.coequalizer (I.identity base,other));
       reject "equalizer parallel endpoint" nonparallel
-        (U.set_equalizer (I.ident base,other))) [different_source;different_target];
-    let f = get (I.arrow (ints [1;2]) (fun x -> x) (ints [1;2;3;4])) in
-    let g = get (I.arrow (ints [1;2]) (fun x ->
+        (U.equalizer (I.identity base,other))) [different_source;different_target];
+    let f = get (I.morphism (ints [1;2]) (fun x -> x) (ints [1;2;3;4])) in
+    let g = get (I.morphism (ints [1;2]) (fun x ->
       match I.view x with I.Atom n -> v (n+1) | _ -> assert false) (ints [1;2;3;4])) in
-    let ce,_ = get (U.set_coequalizer (f,g)) in
+    let ce,_ = get (U.coequalizer (f,g)) in
     check "transitive quotient closure" (I.cardinality ce.Universal.Limits.coeq_obj = 2 &&
-      I.equal (get (I.apply ce.Universal.Limits.coeq_arrow (v 1))) (get (I.apply ce.Universal.Limits.coeq_arrow (v 3))) &&
-      not (I.equal (get (I.apply ce.Universal.Limits.coeq_arrow (v 1))) (get (I.apply ce.Universal.Limits.coeq_arrow (v 4)))));
+      I.equal (get (I.eval ce.Universal.Limits.coeq_arrow (v 1))) (get (I.eval ce.Universal.Limits.coeq_arrow (v 3))) &&
+      not (I.equal (get (I.eval ce.Universal.Limits.coeq_arrow (v 1))) (get (I.eval ce.Universal.Limits.coeq_arrow (v 4)))));
     let other_target = ints [4;3;2;1] in
-    let f' = get (I.arrow_result (I.source f) (I.apply f) other_target) in
-    let g' = get (I.arrow_result (I.source g) (I.apply g) other_target) in
-    let ce',factor' = get (U.set_coequalizer (f',g')) in
-    let _,factor = get (U.set_coequalizer (f,g)) in
+    let f' = get (I.morphism_result (I.domain f) (I.eval f) other_target) in
+    let g' = get (I.morphism_result (I.domain g) (I.eval g) other_target) in
+    let ce',factor' = get (U.coequalizer (f',g')) in
+    let _,factor = get (U.coequalizer (f,g)) in
     let forward = get (factor ce'.Universal.Limits.coeq_obj ce'.Universal.Limits.coeq_arrow) in
     let backward = get (factor' ce.Universal.Limits.coeq_obj ce.Universal.Limits.coeq_arrow) in
     check "representative presentations are isomorphic"
-      (arrow_eq (composite backward forward) (I.ident ce.Universal.Limits.coeq_obj) &&
-       arrow_eq (composite forward backward) (I.ident ce'.Universal.Limits.coeq_obj));
+      (arrow_eq (composite backward forward) (I.identity ce.Universal.Limits.coeq_obj) &&
+       arrow_eq (composite forward backward) (I.identity ce'.Universal.Limits.coeq_obj));
     let nested = I.cartesian_prod cp.Universal.Limits.coprod_obj base in
-    let nested_product,nested_pair = get (U.set_product (cp.Universal.Limits.coprod_obj,base)) in
+    let nested_product,nested_pair = get (U.product (cp.Universal.Limits.coprod_obj,base)) in
     let diagonal = get (nested_pair nested_product.Universal.Limits.prod_obj
       nested_product.Universal.Limits.prod_proj1 nested_product.Universal.Limits.prod_proj2) in
-    check "nested product mediator" (arrow_eq diagonal (I.ident nested_product.Universal.Limits.prod_obj));
-    let nested_sum,nested_fold = get (U.set_coproduct (cp.Universal.Limits.coprod_obj,base)) in
-    let fold = get (nested_fold cp.Universal.Limits.coprod_obj (I.ident cp.Universal.Limits.coprod_obj)
+    check "nested product mediator" (arrow_eq diagonal (I.identity nested_product.Universal.Limits.prod_obj));
+    let nested_sum,nested_fold = get (U.coproduct (cp.Universal.Limits.coprod_obj,base)) in
+    let fold = get (nested_fold cp.Universal.Limits.coprod_obj (I.identity cp.Universal.Limits.coprod_obj)
       cp.Universal.Limits.coprod_inj2) in
     check "nested coproduct mediator" (arrow_eq
-      (composite fold nested_sum.Universal.Limits.coprod_inj1) (I.ident cp.Universal.Limits.coprod_obj) &&
+      (composite fold nested_sum.Universal.Limits.coprod_inj1) (I.identity cp.Universal.Limits.coprod_obj) &&
       arrow_eq (composite fold nested_sum.Universal.Limits.coprod_inj2) cp.Universal.Limits.coprod_inj2);
-    let e = get (I.arrow I.emptyset (fun _ -> assert false) nested) in
-    let ce,_ = get (U.set_coequalizer (e,e)) in
-    check "nested representative closure" (I.seteq ce.Universal.Limits.coeq_obj nested);
-    let _,factor = get (U.set_coequalizer (I.ident base,I.ident base)) in
+    let e = get (I.morphism I.empty (fun _ -> assert false) nested) in
+    let ce,_ = get (U.coequalizer (e,e)) in
+    check "nested representative closure" (I.equal_carrier ce.Universal.Limits.coeq_obj nested);
+    let _,factor = get (U.coequalizer (I.identity base,I.identity base)) in
     reject "quotient factor endpoints" noncomp (factor base wrong);
-    let narrow_image = get (I.arrow base (fun _ -> v 1) singleton) in
+    let narrow_image = get (I.morphism base (fun _ -> v 1) singleton) in
     reject "quotient factor target" noncomp (factor base narrow_image);
-    let _,lift = get (U.set_equalizer (I.ident base,I.ident base)) in
+    let _,lift = get (U.equalizer (I.identity base,I.identity base)) in
     reject "equalizer factor endpoints" noncomp (lift base wrong);
-    let strings = S.of_list [S.atom "x";S.atom "y"] in
-    let terminal = get (SU.set_terminal.Universal.Limits.term_univ strings) in
-    check "non-unit terminal" (S.seteq (S.source terminal) strings);
+    let strings = S.carrier_of_list [S.atom "x";S.atom "y"] in
+    let terminal = get (SU.terminal.Universal.Limits.term_univ strings) in
+    check "non-unit terminal" (S.equal_carrier (S.domain terminal) strings);
     let dual = SU.io_cp_ce_dual_finset in
     let t = get (dual.Universal.Limits.iocc_initial.Universal.Limits.init_univ strings) in
     check "non-unit dual initial endpoints" (Foundations.Category.has_endpoints dual.Universal.Limits.iocc_cat t
@@ -148,20 +148,20 @@ module Primitives = struct
     let prod,_ = get (dual.Universal.Limits.iocc_coproduct (strings,strings)) in
     check "dual coproduct directions" (Foundations.Category.has_endpoints dual.Universal.Limits.iocc_cat
       prod.Universal.Limits.coprod_inj1 strings prod.Universal.Limits.coprod_obj);
-    ignore (get (dual.Universal.Limits.iocc_coequalizer (S.ident strings,S.ident strings)));
-    ignore (get (SU.set_coproduct (strings,strings)));
-    let chars = Ch.of_list [Ch.atom 'a';Ch.atom 'b'] in
-    let flip = get (Ch.arrow chars (fun x -> match Ch.view x with
+    ignore (get (dual.Universal.Limits.iocc_coequalizer (S.identity strings,S.identity strings)));
+    ignore (get (SU.coproduct (strings,strings)));
+    let chars = Ch.carrier_of_list [Ch.atom 'a';Ch.atom 'b'] in
+    let flip = get (Ch.morphism chars (fun x -> match Ch.view x with
       | Ch.Atom 'a' -> Ch.atom 'b' | _ -> Ch.atom 'a') chars) in
-    let ce,_ = get (ChU.set_coequalizer (Ch.ident chars,flip)) in
+    let ce,_ = get (ChU.coequalizer (Ch.identity chars,flip)) in
     check "character quotient" (Ch.cardinality ce.Universal.Limits.coeq_obj = 1);
-    let iso1,iso2 = get (Universal.Limits.iso_initial U.set_initial U.set_initial) in
-    check "initial isomorphism" (arrow_eq (composite iso1 iso2) (I.ident I.emptyset))
+    let iso1,iso2 = get (Universal.Limits.iso_initial U.initial U.initial) in
+    check "initial isomorphism" (arrow_eq (composite iso1 iso2) (I.identity I.empty))
 
   let test_pushouts () =
     List.iter (fun a -> List.iter (fun b -> List.iter (fun c ->
       List.iter (fun f -> List.iter (fun g ->
-        let po,med = get (U.set_pushout (f,g)) in
+        let po,med = get (U.pushout (f,g)) in
         let p = po.Universal.Limits.pushout_leg1 and q = po.Universal.Limits.pushout_leg2 in
         endpoints "pushout left source" p b po.Universal.Limits.pushout_obj;
         endpoints "pushout right source" q c po.Universal.Limits.pushout_obj;
@@ -179,29 +179,29 @@ module Primitives = struct
       ) (all_maps a c)) (all_maps a b)
     ) objects) objects) objects;
     let a = ints [1] in
-    let f = I.ident a and g = get (I.arrow a (fun x -> x) base) in
-    let po,_ = get (U.set_pushout (f,g)) in
+    let f = I.identity a and g = get (I.morphism a (fun x -> x) base) in
+    let po,_ = get (U.pushout (f,g)) in
     check "pushout regression cardinality" (I.cardinality po.Universal.Limits.pushout_obj = 2);
-    reject "pushout common source" noncomp (U.set_pushout (I.ident base, f));
-    let _,med = get (U.set_pushout (f,g)) in
-    reject "pushout mediator endpoints" noncomp (med base (I.ident base) (I.ident base))
+    reject "pushout common source" noncomp (U.pushout (I.identity base, f));
+    let _,med = get (U.pushout (f,g)) in
+    reject "pushout mediator endpoints" noncomp (med base (I.identity base) (I.identity base))
 
   let test_graphs () =
     let a = ints [1] in
-    let f = get (I.arrow a (fun x -> x) base) in
+    let f = get (I.morphism a (fun x -> x) base) in
     let shape = get (Universal.Diagrams.graph ~nodes:["a";"b"] ~edges:["e","a","b"]) in
     let d = get (Universal.Diagrams.diagram I.cat shape ~objects:["a",a;"b",base] ~arrows:["e",f]) in
     let reordered = get (Universal.Diagrams.graph ~nodes:["b";"a"] ~edges:["e","a","b"]) in
-    let f' = get (I.arrow a (fun _ -> v 1) (ints [2;1])) in
+    let f' = get (I.morphism a (fun _ -> v 1) (ints [2;1])) in
     let d' = get (Universal.Diagrams.diagram I.cat reordered ~objects:["b",ints [2;1];"a",a] ~arrows:["e",f']) in
     check "extensional base equality" (Universal.Diagrams.same_base d d');
-    let cc = get (Universal.Diagrams.cocone d base ~sides:["a",f;"b",I.ident base]) in
-    let cc' = get (Universal.Diagrams.cocone d' base ~sides:["b",I.ident base;"a",f']) in
-    let ca = get (Universal.Diagrams.cocone_arrow cc (I.ident base) cc') in
-    check "cocone accessor has correct type" (arrow_eq (Universal.Diagrams.cocone_apex_arrow ca) (I.ident base));
-    let cone = get (Universal.Diagrams.cone d a ~sides:["a",I.ident a;"b",f]) in
-    let coar = get (Universal.Diagrams.cone_arrow cone (I.ident a) cone) in
-    check "cone accessor" (arrow_eq (Universal.Diagrams.cone_apex_arrow coar) (I.ident a));
+    let cc = get (Universal.Diagrams.cocone d base ~sides:["a",f;"b",I.identity base]) in
+    let cc' = get (Universal.Diagrams.cocone d' base ~sides:["b",I.identity base;"a",f']) in
+    let ca = get (Universal.Diagrams.cocone_arrow cc (I.identity base) cc') in
+    check "cocone accessor has correct type" (arrow_eq (Universal.Diagrams.cocone_apex_arrow ca) (I.identity base));
+    let cone = get (Universal.Diagrams.cone d a ~sides:["a",I.identity a;"b",f]) in
+    let coar = get (Universal.Diagrams.cone_arrow cone (I.identity a) cone) in
+    check "cone accessor" (arrow_eq (Universal.Diagrams.cone_apex_arrow coar) (I.identity a));
     reject "graph bad endpoint" (function Foundations.Category.Malformed_graph _ -> true | _ -> false)
       (Universal.Diagrams.graph ~nodes:["a"] ~edges:["e","a","missing"]);
     reject "graph error locates endpoint"
@@ -219,29 +219,29 @@ module Primitives = struct
     reject "diagram extra" (function Foundations.Category.Malformed_diagram _ -> true | _ -> false)
       (Universal.Diagrams.diagram I.cat shape ~objects:["a",a;"b",base;"z",base] ~arrows:["e",f]);
     reject "diagram edge endpoints" (function Foundations.Category.Malformed_diagram _ -> true | _ -> false)
-      (Universal.Diagrams.diagram I.cat shape ~objects:["a",a;"b",base] ~arrows:["e",I.ident base]);
+      (Universal.Diagrams.diagram I.cat shape ~objects:["a",a;"b",base] ~arrows:["e",I.identity base]);
     reject "node outside base" outside (Universal.Diagrams.node_object d "missing");
     reject "edge outside graph" outside (Universal.Diagrams.graph_source shape "missing");
-    let bad = get (I.arrow a (fun _ -> v 2) base) in
+    let bad = get (I.morphism a (fun _ -> v 2) base) in
     let changed = get (Universal.Diagrams.diagram I.cat shape ~objects:["a",a;"b",base] ~arrows:["e",bad]) in
     check "changed arrow changes base" (not (Universal.Diagrams.same_base d changed));
-    let cc_bad = get (Universal.Diagrams.cocone changed base ~sides:["a",bad;"b",I.ident base]) in
+    let cc_bad = get (Universal.Diagrams.cocone changed base ~sides:["a",bad;"b",I.identity base]) in
     reject "different cocone base" (function Foundations.Category.Different_base _ -> true | _ -> false)
-      (Universal.Diagrams.cocone_arrow cc (I.ident base) cc_bad);
+      (Universal.Diagrams.cocone_arrow cc (I.identity base) cc_bad);
     reject "noncommuting cocone" noncommuting
-      (Universal.Diagrams.cocone d base ~sides:["a",bad;"b",I.ident base]);
+      (Universal.Diagrams.cocone d base ~sides:["a",bad;"b",I.identity base]);
     reject "noncommuting cone" noncommuting
-      (Universal.Diagrams.cone d a ~sides:["a",I.ident a;"b",bad]);
+      (Universal.Diagrams.cone d a ~sides:["a",I.identity a;"b",bad]);
     reject "side endpoints" (function Foundations.Category.Malformed_diagram _ -> true | _ -> false)
-      (Universal.Diagrams.cocone d base ~sides:["a",I.ident base;"b",I.ident base]);
-    reject "cocone arrow endpoints" noncomp (Universal.Diagrams.cocone_arrow cc (I.ident a) cc);
-    let constant = get (I.arrow base (fun _ -> v 2) base) in
+      (Universal.Diagrams.cocone d base ~sides:["a",I.identity base;"b",I.identity base]);
+    reject "cocone arrow endpoints" noncomp (Universal.Diagrams.cocone_arrow cc (I.identity a) cc);
+    let constant = get (I.morphism base (fun _ -> v 2) base) in
     reject "cocone arrow equation" noncommuting (Universal.Diagrams.cocone_arrow cc constant cc);
     let span = get (Constructions.Spans.span I.cat f f) in
-    check "span plumbing endpoints" (I.seteq (Constructions.Spans.span_source span) a &&
+    check "span plumbing endpoints" (I.equal_carrier (Constructions.Spans.span_source span) a &&
       arrow_eq (Constructions.Spans.span_left span) f && arrow_eq (Constructions.Spans.span_right span) f);
     reject "span common source" (function Foundations.Category.Malformed_relation _ -> true | _ -> false)
-      (Constructions.Spans.span I.cat f (I.ident base));
+      (Constructions.Spans.span I.cat f (I.identity base));
     let empty = get (Universal.Diagrams.graph ~nodes:[] ~edges:[]) in
     let d0 = get (Universal.Diagrams.diagram I.cat empty ~objects:[] ~arrows:[]) in
     ignore (get (Universal.Diagrams.cone d0 base ~sides:[]));
@@ -263,10 +263,10 @@ open Category_test_support.Checks
 let different = function Foundations.Category.Different_base _ -> true | _ -> false
 let noncomp = function Foundations.Category.Non_composable _ -> true | _ -> false
 let noncommuting = function Foundations.Category.Non_commuting _ -> true | _ -> false
-let ints xs = F.of_list (List.map F.atom xs)
+let ints xs = F.carrier_of_list (List.map F.atom xs)
 let objects = F.powerset (ints [1;2])
 let compose g f = get (F.compose g f)
-let eq = F.equal_arrow
+let eq = F.equal_morphism
 let diagrams = ref 0
 let factors = ref 0
 let uniqueness = ref 0
@@ -281,10 +281,10 @@ let rec choices = function
     List.concat_map (fun x ->
       List.map (fun tail -> (label,x) :: tail) (choices rest)) xs
 let all_maps source target =
-  List.map (fun entries -> get (F.arrow_result source (fun x ->
+  List.map (fun entries -> get (F.morphism_result source (fun x ->
     match List.find_opt (fun (y,_) -> F.equal x y) entries with
     | Some (_,v) -> Ok v | None -> Error (Foundations.Category.Outside_domain "test mapping")) target))
-    (choices (List.map (fun x -> x,F.to_list target) (F.to_list source)))
+    (choices (List.map (fun x -> x,F.carrier_to_list target) (F.carrier_to_list source)))
 let shapes = [
   [], [];
   ["a"], [];
@@ -321,12 +321,12 @@ let compatible cat d outgoing sides =
 
 let same_cocone a b =
   Universal.Diagrams.same_base (Universal.Diagrams.cocone_base a) (Universal.Diagrams.cocone_base b) &&
-  F.seteq (Universal.Diagrams.cocone_apex a) (Universal.Diagrams.cocone_apex b) &&
+  F.equal_carrier (Universal.Diagrams.cocone_apex a) (Universal.Diagrams.cocone_apex b) &&
   List.for_all (fun n -> eq (get (Universal.Diagrams.cocone_side a n)) (get (Universal.Diagrams.cocone_side b n)))
     (Universal.Diagrams.diagram_nodes (Universal.Diagrams.cocone_base a))
 let same_cone a b =
   Universal.Diagrams.same_base (Universal.Diagrams.cone_base a) (Universal.Diagrams.cone_base b) &&
-  F.seteq (Universal.Diagrams.cone_apex a) (Universal.Diagrams.cone_apex b) &&
+  F.equal_carrier (Universal.Diagrams.cone_apex a) (Universal.Diagrams.cone_apex b) &&
   List.for_all (fun n -> eq (get (Universal.Diagrams.cone_side a n)) (get (Universal.Diagrams.cone_side b n)))
     (Universal.Diagrams.diagram_nodes (Universal.Diagrams.cone_base a))
 
@@ -339,7 +339,7 @@ let check_colimit d result =
     (Foundations.Category.has_endpoints F.cat f (get (Universal.Diagrams.node_object d n)) apex)) sides;
   check "colimit edge equations" (compatible F.cat d true sides);
   check "colimit universal identity"
-    (eq (Universal.Diagrams.cocone_apex_arrow (get (result.Universal.Limits.colim_univ cc))) (F.ident apex));
+    (eq (Universal.Diagrams.cocone_apex_arrow (get (result.Universal.Limits.colim_univ cc))) (F.identity apex));
   List.iter (fun x ->
     List.iter (fun sides ->
       if compatible F.cat d true sides then begin
@@ -372,7 +372,7 @@ let check_limit d result =
     (Foundations.Category.has_endpoints F.cat f apex (get (Universal.Diagrams.node_object d n)))) sides;
   check "limit edge equations" (compatible F.cat d false sides);
   check "limit universal identity"
-    (eq (Universal.Diagrams.cone_apex_arrow (get (result.Universal.Limits.lim_univ co))) (F.ident apex));
+    (eq (Universal.Diagrams.cone_apex_arrow (get (result.Universal.Limits.lim_univ co))) (F.identity apex));
   List.iter (fun x ->
     List.iter (fun sides ->
       if compatible F.cat d false sides then begin
@@ -399,15 +399,15 @@ let check_limit d result =
 let test_finite_diagrams () =
   each_diagram F.cat objects all_maps (fun d ->
     incr diagrams;
-    let cc = get (U.set_colimit d) in
+    let cc = get (U.colimit d) in
     check_colimit d cc;
-    check_limit d (get (U.set_limit d));
-    let round = get (Universal.Limits.dual_limit (Universal.Limits.dual_colimit U.set_colimit) d) in
+    check_limit d (get (U.limit d));
+    let round = get (Universal.Limits.dual_limit (Universal.Limits.dual_colimit U.colimit) d) in
     let u = Universal.Diagrams.cocone_apex_arrow (get (cc.Universal.Limits.colim_univ round.Universal.Limits.colim_cocone)) in
     let v = Universal.Diagrams.cocone_apex_arrow (get (round.Universal.Limits.colim_univ cc.Universal.Limits.colim_cocone)) in
     check "double dual universality isomorphism"
-      (eq (compose v u) (F.ident (Universal.Diagrams.cocone_apex cc.Universal.Limits.colim_cocone)) &&
-       eq (compose u v) (F.ident (Universal.Diagrams.cocone_apex round.Universal.Limits.colim_cocone)));
+      (eq (compose v u) (F.identity (Universal.Diagrams.cocone_apex cc.Universal.Limits.colim_cocone)) &&
+       eq (compose u v) (F.identity (Universal.Diagrams.cocone_apex round.Universal.Limits.colim_cocone)));
     check "diagram double dual" (Universal.Diagrams.same_base d (Universal.Diagrams.dual_diagram (Universal.Diagrams.dual_diagram d))))
 
 (* The two-object poset false <= true: arrows are endpoint pairs, not FinSet
@@ -497,7 +497,7 @@ let test_pullbacks () =
   List.iter (fun a -> List.iter (fun b -> List.iter (fun c ->
     List.iter (fun f -> List.iter (fun g ->
       incr pullbacks;
-      let pb,med = get (U.set_pullback (f,g)) in
+      let pb,med = get (U.pullback (f,g)) in
       let p = pb.Universal.Limits.pullback_proj1 and q = pb.Universal.Limits.pullback_proj2 in
       check "pullback projection sources"
         (Foundations.Category.has_endpoints F.cat p pb.Universal.Limits.pullback_obj a &&
@@ -518,21 +518,21 @@ let test_pullbacks () =
           (all_maps x b)) (all_maps x a)) objects
     ) (all_maps b c)) (all_maps a c)) objects) objects) objects;
   let s = ints [1] and b = ints [1;2] in
-  let f = get (F.arrow b (fun _ -> F.atom 1) s) in
-  reject "pullback common target" noncomp (U.set_pullback (F.ident b,f));
-  let _,med = get (U.set_pullback (f,f)) in
-  reject "pullback mediator endpoints" noncomp (med b (F.ident s) (F.ident b))
+  let f = get (F.morphism b (fun _ -> F.atom 1) s) in
+  reject "pullback common target" noncomp (U.pullback (F.identity b,f));
+  let _,med = get (U.pullback (f,f)) in
+  reject "pullback mediator endpoints" noncomp (med b (F.identity s) (F.identity b))
 
 let test_transformations_and_failures () =
   let b = ints [1;2] and s = ints [1] in
-  let identity = F.ident b in
+  let identity = F.identity b in
   let shape = get (Universal.Diagrams.graph ~nodes:["a";"b"] ~edges:["f","a","b"]) in
   let d = get (Universal.Diagrams.diagram F.cat shape ~objects:["a",b;"b",b] ~arrows:["f",identity]) in
   let tail = Universal.Diagrams.discrete_tail d in
   check "discrete restriction preserves the remaining node"
     (Universal.Diagrams.diagram_nodes tail = ["b"] &&
      Universal.Diagrams.diagram_edges tail = [] &&
-     F.seteq (get (Universal.Diagrams.node_object tail "b")) b);
+     F.equal_carrier (get (Universal.Diagrams.node_object tail "b")) b);
   let discrete = Universal.Diagrams.without_first_edge d in
   check "edge restriction preserves all nodes"
     (Universal.Diagrams.diagram_nodes discrete = ["a";"b"] &&
@@ -545,7 +545,7 @@ let test_transformations_and_failures () =
     (Universal.Diagrams.same_base empty (Universal.Diagrams.discrete_tail empty));
   let armed = ref false in
   let guarded = { F.cat with Foundations.Category.source = (fun a ->
-    if !armed then failwith "restriction rechecked a callback" else F.source a) } in
+    if !armed then failwith "restriction rechecked a callback" else F.domain a) } in
   let guarded_diagram = get (Universal.Diagrams.diagram guarded shape
     ~objects:["a",b;"b",b] ~arrows:["f",identity]) in
   armed := true;
@@ -553,43 +553,43 @@ let test_transformations_and_failures () =
   ignore (Universal.Diagrams.without_first_edge guarded_diagram);
   check "graph incidence enumeration is retained"
     (Universal.Diagrams.graph_bindings shape = ["f","a","b"]);
-  let cc = get (U.set_colimit d) and co = get (U.set_limit d) in
+  let cc = get (U.colimit d) and co = get (U.limit d) in
   check "cocone side enumeration preserves its bindings"
     (List.map fst (Universal.Diagrams.cocone_sides cc.Universal.Limits.colim_cocone)
      = ["a";"b"]);
   let shape' = get (Universal.Diagrams.graph ~nodes:["b";"a"] ~edges:["f","a","b"]) in
   let reversed = ints [2;1] in
   let d' = get (Universal.Diagrams.diagram F.cat shape' ~objects:["b",reversed;"a",reversed]
-    ~arrows:["f",F.ident reversed]) in
-  let cc' = get (U.set_colimit d') and co' = get (U.set_limit d') in
+    ~arrows:["f",F.identity reversed]) in
+  let cc' = get (U.colimit d') and co' = get (U.limit d') in
   let u = Universal.Diagrams.cocone_apex_arrow (get (cc.Universal.Limits.colim_univ cc'.Universal.Limits.colim_cocone)) in
   let v = Universal.Diagrams.cocone_apex_arrow (get (cc'.Universal.Limits.colim_univ cc.Universal.Limits.colim_cocone)) in
   check "colimit presentation isomorphism"
-    (eq (compose v u) (F.ident (Universal.Diagrams.cocone_apex cc.Universal.Limits.colim_cocone)) &&
-     eq (compose u v) (F.ident (Universal.Diagrams.cocone_apex cc'.Universal.Limits.colim_cocone)));
+    (eq (compose v u) (F.identity (Universal.Diagrams.cocone_apex cc.Universal.Limits.colim_cocone)) &&
+     eq (compose u v) (F.identity (Universal.Diagrams.cocone_apex cc'.Universal.Limits.colim_cocone)));
   let u = Universal.Diagrams.cone_apex_arrow (get (co.Universal.Limits.lim_univ co'.Universal.Limits.lim_cone)) in
   let v = Universal.Diagrams.cone_apex_arrow (get (co'.Universal.Limits.lim_univ co.Universal.Limits.lim_cone)) in
   check "limit presentation isomorphism"
-    (eq (compose u v) (F.ident (Universal.Diagrams.cone_apex co.Universal.Limits.lim_cone)) &&
-     eq (compose v u) (F.ident (Universal.Diagrams.cone_apex co'.Universal.Limits.lim_cone)));
-  let flip = get (F.arrow b (fun x -> match F.view x with
+    (eq (compose u v) (F.identity (Universal.Diagrams.cone_apex co.Universal.Limits.lim_cone)) &&
+     eq (compose v u) (F.identity (Universal.Diagrams.cone_apex co'.Universal.Limits.lim_cone)));
+  let flip = get (F.morphism b (fun x -> match F.view x with
     | F.Atom 1 -> F.atom 2 | _ -> F.atom 1) b) in
   let changed = get (Universal.Diagrams.diagram F.cat shape ~objects:["a",b;"b",b] ~arrows:["f",flip]) in
-  let constant = get (F.arrow b (fun _ -> F.atom 1) s) in
+  let constant = get (F.morphism b (fun _ -> F.atom 1) s) in
   let other = get (Universal.Diagrams.cocone changed s ~sides:["a",constant;"b",constant]) in
   reject "colimit different edge base" different (cc.Universal.Limits.colim_univ other);
-  let cone = get (Universal.Diagrams.cone changed s ~sides:["a",get (F.arrow s (fun _ -> F.atom 1) b);
-    "b",get (F.arrow s (fun _ -> F.atom 2) b)]) in
+  let cone = get (Universal.Diagrams.cone changed s ~sides:["a",get (F.morphism s (fun _ -> F.atom 1) b);
+    "b",get (F.morphism s (fun _ -> F.atom 2) b)]) in
   reject "limit different edge base" different (co.Universal.Limits.lim_univ cone);
   let empty = get (Universal.Diagrams.diagram F.cat (get (Universal.Diagrams.graph ~nodes:[] ~edges:[])) ~objects:[] ~arrows:[]) in
-  let e = get (U.set_colimit empty) in
+  let e = get (U.colimit empty) in
   reject "empty colimit wrong base" different (e.Universal.Limits.colim_univ other);
-  let e = get (U.set_limit empty) in
+  let e = get (U.limit empty) in
   reject "empty limit wrong base" different (e.Universal.Limits.lim_univ cone);
   let low = get (Universal.Diagrams.cocone d s ~sides:["a",constant;"b",constant]) in
-  let high = get (Universal.Diagrams.cocone d b ~sides:["a",compose (get (F.arrow s (fun x -> x) b)) constant;
-    "b",compose (get (F.arrow s (fun x -> x) b)) constant]) in
-  let arrow = get (Universal.Diagrams.cocone_arrow low (get (F.arrow s (fun x -> x) b)) high) in
+  let high = get (Universal.Diagrams.cocone d b ~sides:["a",compose (get (F.morphism s (fun x -> x) b)) constant;
+    "b",compose (get (F.morphism s (fun x -> x) b)) constant]) in
+  let arrow = get (Universal.Diagrams.cocone_arrow low (get (F.morphism s (fun x -> x) b)) high) in
   let dual = Universal.Diagrams.dual_cocone_arrow arrow in
   check "dual cocone arrow reverses domain"
     (same_cone (Universal.Diagrams.cone_arrow_domain dual) (Universal.Diagrams.dual_cocone high));
@@ -599,7 +599,7 @@ let test_transformations_and_failures () =
   check "double dual cocone arrow"
     (eq (Universal.Diagrams.cocone_apex_arrow restored) (Universal.Diagrams.cocone_apex_arrow arrow) &&
      same_cocone (Universal.Diagrams.cocone_arrow_domain restored) low);
-  let dual_limit = Universal.Limits.dual_limit (Universal.Limits.dual_colimit U.set_colimit) in
+  let dual_limit = Universal.Limits.dual_limit (Universal.Limits.dual_colimit U.colimit) in
   check_colimit d (get (dual_limit d));
   let sentinel = Foundations.Category.Non_commuting "primitive sentinel" in
   let bad = { U.io_cp_ce_finset with Universal.Limits.iocc_coequalizer = (fun _ -> Error sentinel) } in
@@ -612,19 +612,19 @@ let test_transformations_and_failures () =
 module S = Instances.Finite_sets.Make (struct type t = string let equal = String.equal end)
 module SU = Instances.Finite_set_universals.Make (S)
 let test_book_pushout () =
-  let set names = S.of_list (List.map S.atom names) in
+  let set names = S.carrier_of_list (List.map S.atom names) in
   let a = set ["A";"B";"C";"D"] and b = set ["C";"D";"E";"F";"G"] in
   let c = set ["B";"E";"F";"G"] in
-  let map source entries target = get (S.arrow source (fun x -> match S.view x with
+  let map source entries target = get (S.morphism source (fun x -> match S.view x with
     | S.Atom name -> S.atom (List.assoc name entries) | _ -> assert false) target) in
   let f = map a ["A","C";"B","C";"C","D";"D","E"] b in
   let g = map a ["A","B";"B","E";"C","B";"D","F"] c in
   let shape = get (Universal.Diagrams.graph ~nodes:["a";"b";"c"] ~edges:["f","a","b";"g","a","c"]) in
   let d = get (Universal.Diagrams.diagram S.cat shape ~objects:["a",a;"b",b;"c",c] ~arrows:["f",f;"g",g]) in
-  let cc = get (SU.set_colimit d) in
+  let cc = get (SU.colimit d) in
   let apex = Universal.Diagrams.cocone_apex cc.Universal.Limits.colim_cocone in
   check "book pushout five classes" (S.cardinality apex = 5);
-  let image (node,name) = get (S.apply (get (Universal.Diagrams.cocone_side cc.Universal.Limits.colim_cocone node)) (S.atom name)) in
+  let image (node,name) = get (S.eval (get (Universal.Diagrams.cocone_side cc.Universal.Limits.colim_cocone node)) (S.atom name)) in
   let classes = [
     ["a","A";"a","B";"a","C";"b","C";"b","D";"c","B";"c","E"];
     ["a","D";"b","E";"c","F"];
@@ -633,10 +633,10 @@ let test_book_pushout () =
     let rep = image (List.hd cls) in
     check "book labelled identifications" (List.for_all (fun x -> S.equal rep (image x)) cls);
     rep) classes in
-  check "book classes remain distinct" (S.cardinality (S.of_list reps) = 5);
+  check "book classes remain distinct" (S.cardinality (S.carrier_of_list reps) = 5);
   let expected = set ["one";"two";"three";"four";"five"] in
   let labels = ["one";"two";"three";"four";"five"] in
-  let side node domain = get (S.arrow domain (fun x -> match S.view x with
+  let side node domain = get (S.morphism domain (fun x -> match S.view x with
     | S.Atom name ->
       let rec locate classes labels = match classes,labels with
         | cls::rest,label::tail -> if List.mem (node,name) cls then S.atom label
@@ -645,32 +645,32 @@ let test_book_pushout () =
     | _ -> assert false) expected) in
   let other = get (Universal.Diagrams.cocone d expected ~sides:["a",side "a" a;"b",side "b" b;"c",side "c" c]) in
   let forward = Universal.Diagrams.cocone_apex_arrow (get (cc.Universal.Limits.colim_univ other)) in
-  let backward = get (S.arrow expected (fun x -> match S.view x with
+  let backward = get (S.morphism expected (fun x -> match S.view x with
     | S.Atom label -> List.assoc label (List.combine labels reps) | _ -> assert false) apex) in
   check "book explicit comparison isomorphism"
-    (S.equal_arrow (get (S.compose backward forward)) (S.ident apex) &&
-     S.equal_arrow (get (S.compose forward backward)) (S.ident expected));
+    (S.equal_morphism (get (S.compose backward forward)) (S.identity apex) &&
+     S.equal_morphism (get (S.compose forward backward)) (S.identity expected));
   let reordered = get (Universal.Diagrams.diagram S.cat
     (get (Universal.Diagrams.graph ~nodes:["c";"a";"b"] ~edges:["g","a","c";"f","a","b"]))
     ~objects:["c",c;"b",b;"a",a] ~arrows:["g",g;"f",f]) in
-  let cc' = get (SU.set_colimit reordered) in
+  let cc' = get (SU.colimit reordered) in
   let u = Universal.Diagrams.cocone_apex_arrow (get (cc.Universal.Limits.colim_univ cc'.Universal.Limits.colim_cocone)) in
   let v = Universal.Diagrams.cocone_apex_arrow (get (cc'.Universal.Limits.colim_univ cc.Universal.Limits.colim_cocone)) in
   check "book reordered node and edge presentation isomorphism"
-    (S.equal_arrow (get (S.compose v u)) (S.ident apex) &&
-     S.equal_arrow (get (S.compose u v)) (S.ident (Universal.Diagrams.cocone_apex cc'.Universal.Limits.colim_cocone)));
-  let po,med = get (SU.set_pushout (f,g)) in
+    (S.equal_morphism (get (S.compose v u)) (S.identity apex) &&
+     S.equal_morphism (get (S.compose u v)) (S.identity (Universal.Diagrams.cocone_apex cc'.Universal.Limits.colim_cocone)));
+  let po,med = get (SU.pushout (f,g)) in
   check "book specialization cardinality" (S.cardinality po.Universal.Limits.pushout_obj = 5);
   let u = get (med expected (side "b" b) (side "c" c)) in
   check "book specialized mediator"
-    (S.equal_arrow (get (S.compose u po.Universal.Limits.pushout_leg1)) (side "b" b) &&
-     S.equal_arrow (get (S.compose u po.Universal.Limits.pushout_leg2)) (side "c" c));
-  let pb,med = get (SU.set_pullback (f,f)) in
+    (S.equal_morphism (get (S.compose u po.Universal.Limits.pushout_leg1)) (side "b" b) &&
+     S.equal_morphism (get (S.compose u po.Universal.Limits.pushout_leg2)) (side "c" c));
+  let pb,med = get (SU.pullback (f,f)) in
   check "non-unit pullback witnesses" (S.cardinality pb.Universal.Limits.pullback_obj = 6);
-  let u = get (med a (S.ident a) (S.ident a)) in
+  let u = get (med a (S.identity a) (S.identity a)) in
   check "non-unit pullback mediator"
-    (S.equal_arrow (get (S.compose pb.Universal.Limits.pullback_proj1 u)) (S.ident a) &&
-     S.equal_arrow (get (S.compose pb.Universal.Limits.pullback_proj2 u)) (S.ident a))
+    (S.equal_morphism (get (S.compose pb.Universal.Limits.pullback_proj1 u)) (S.identity a) &&
+     S.equal_morphism (get (S.compose pb.Universal.Limits.pullback_proj2 u)) (S.identity a))
 
 let () =
   Primitives.run ();

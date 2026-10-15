@@ -1,0 +1,12 @@
+open Computational_category
+module F = Instances.Finite_sets.Make (struct
+  type t = string
+  let equal = String.equal
+end)
+module T = Instances.Finite_set_topos.Make (F)
+let a = F.carrier_of_list [F.atom "a"; F.atom "b"]
+let b = F.carrier_of_list [F.atom "0"; F.atom "1"]
+let () =
+  match T.function_space a b with
+  | Ok fs when F.cardinality fs = 4 -> print_endline "Chapter7 public consumer passed"
+  | _ -> exit 1

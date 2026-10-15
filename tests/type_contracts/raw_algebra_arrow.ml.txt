@@ -1,0 +1,2 @@
+open Computational_category
+let expose (h : (unit,unit) Constructions.Algebras.algebra_morphism) = h.map

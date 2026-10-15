@@ -6,14 +6,14 @@ module R = Instances.Finite_relations.Make (F)
 open Category_test_support.Checks
 let malformed = function Foundations.Category.Malformed_relation _ -> true | _ -> false
 let noncomp = function Foundations.Category.Non_composable _ -> true | _ -> false
-let ints xs = F.of_list (List.map F.atom xs)
+let ints xs = F.carrier_of_list (List.map F.atom xs)
 let base = ints [1;2]
 let objects = F.powerset base
 let left = Constructions.Spans.span_left
 let right = Constructions.Spans.span_right
 let source = Constructions.Spans.span_source
 let comp next previous = get (Constructions.Spans.compose U.complete_finset next previous)
-let amap f x = get (F.apply f x)
+let amap f x = get (F.eval f x)
 let arrow_comp g f = get (F.compose g f)
 let admissions = ref 0
 let compositions = ref 0
@@ -21,7 +21,7 @@ let associations = ref 0
 let isomorphisms = ref 0
 
 let relation a pairs b = get (R.relation_span ~left:a ~right:b pairs)
-let pairs xs = F.of_list (List.map (fun (x,y) -> F.pair (F.atom x) (F.atom y)) xs)
+let pairs xs = F.carrier_of_list (List.map (fun (x,y) -> F.pair (F.atom x) (F.atom y)) xs)
 
 let rec choices = function
   | [] -> [[]]
@@ -29,22 +29,22 @@ let rec choices = function
     List.concat_map (fun value -> List.map (fun entries -> (x,value)::entries)
       (choices rest)) values
 let all_maps domain codomain =
-  List.map (fun entries -> get (F.arrow domain (fun x ->
+  List.map (fun entries -> get (F.morphism domain (fun x ->
     snd (List.find (fun (y,_) -> F.equal x y) entries)) codomain))
-    (choices (List.map (fun x -> x,F.to_list codomain) (F.to_list domain)))
+    (choices (List.map (fun x -> x,F.carrier_to_list codomain) (F.carrier_to_list domain)))
 
 let span_endpoints label s a b =
-  check (label ^ " left target") (F.seteq (F.target (left s)) a);
-  check (label ^ " right target") (F.seteq (F.target (right s)) b);
+  check (label ^ " left target") (F.equal_carrier (F.codomain (left s)) a);
+  check (label ^ " right target") (F.equal_carrier (F.codomain (right s)) b);
   check (label ^ " common source")
-    (F.seteq (F.source (left s)) (source s) && F.seteq (F.source (right s)) (source s))
+    (F.equal_carrier (F.domain (left s)) (source s) && F.equal_carrier (F.domain (right s)) (source s))
 
 (* Match finite endpoint fibres one-to-one, then check the constructed arrows
    and inverses. Equal images alone do not prove span isomorphism. *)
 let span_iso label a b =
   check (label ^ " endpoints")
-    (F.seteq (F.target (left a)) (F.target (left b)) &&
-     F.seteq (F.target (right a)) (F.target (right b)));
+    (F.equal_carrier (F.codomain (left a)) (F.codomain (left b)) &&
+     F.equal_carrier (F.codomain (right a)) (F.codomain (right b)));
   let rec match_fibres domain unused =
     match domain with
     | [] -> check (label ^ " onto") (unused = []); []
@@ -55,34 +55,34 @@ let span_iso label a b =
       | None -> failwith (label ^ ": unequal witness fibres")
       | Some y -> (x,y) :: match_fibres rest (List.filter (fun z -> not (F.equal z y)) unused)
   in
-  let entries = match_fibres (F.to_list (source a)) (F.to_list (source b)) in
-  let f = get (F.arrow (source a) (fun x ->
+  let entries = match_fibres (F.carrier_to_list (source a)) (F.carrier_to_list (source b)) in
+  let f = get (F.morphism (source a) (fun x ->
     snd (List.find (fun (v,_) -> F.equal x v) entries)) (source b)) in
-  let g = get (F.arrow (source b) (fun y ->
+  let g = get (F.morphism (source b) (fun y ->
     fst (List.find (fun (_,v) -> F.equal y v) entries)) (source a)) in
   check (label ^ " forward legs")
-    (F.equal_arrow (arrow_comp (left b) f) (left a) &&
-     F.equal_arrow (arrow_comp (right b) f) (right a));
+    (F.equal_morphism (arrow_comp (left b) f) (left a) &&
+     F.equal_morphism (arrow_comp (right b) f) (right a));
   check (label ^ " inverse legs")
-    (F.equal_arrow (arrow_comp (left a) g) (left b) &&
-     F.equal_arrow (arrow_comp (right a) g) (right b));
+    (F.equal_morphism (arrow_comp (left a) g) (left b) &&
+     F.equal_morphism (arrow_comp (right a) g) (right b));
   check (label ^ " inverse equations")
-    (F.equal_arrow (arrow_comp g f) (F.ident (source a)) &&
-     F.equal_arrow (arrow_comp f g) (F.ident (source b)));
+    (F.equal_morphism (arrow_comp g f) (F.identity (source a)) &&
+     F.equal_morphism (arrow_comp f g) (F.identity (source b)));
   incr isomorphisms
 
 let matching_witnesses previous next =
   List.concat_map (fun x -> List.filter_map (fun y ->
     if F.equal (amap (right previous) x) (amap (left next) y)
-    then Some (x,y) else None) (F.to_list (source next))) (F.to_list (source previous))
+    then Some (x,y) else None) (F.carrier_to_list (source next))) (F.carrier_to_list (source previous))
 let image_oracle previous next =
-  F.of_list (List.map (fun (x,y) ->
+  F.carrier_of_list (List.map (fun (x,y) ->
     F.pair (amap (left previous) x) (amap (right next) y))
     (matching_witnesses previous next))
 let direct_relational_image a r b s c =
-  F.of_list (List.concat_map (fun x -> List.filter_map (fun z ->
-    if List.exists (fun y -> F.member (F.pair x y) r && F.member (F.pair y z) s)
-      (F.to_list b) then Some (F.pair x z) else None) (F.to_list c)) (F.to_list a))
+  F.carrier_of_list (List.concat_map (fun x -> List.filter_map (fun z ->
+    if List.exists (fun y -> F.mem (F.pair x y) r && F.mem (F.pair y z) s)
+      (F.carrier_to_list b) then Some (F.pair x z) else None) (F.carrier_to_list c)) (F.carrier_to_list a))
 
 let test_relation_admission () =
   List.iter (fun a -> List.iter (fun b ->
@@ -90,15 +90,15 @@ let test_relation_admission () =
       incr admissions;
       let r = relation a carrier b in
       span_endpoints "relation projection" r a b;
-      check "relation carrier retained" (F.seteq (source r) carrier);
-      check "relation image roundtrip" (F.seteq (get (R.image r)) carrier);
+      check "relation carrier retained" (F.equal_carrier (source r) carrier);
+      check "relation image roundtrip" (F.equal_carrier (get (R.image r)) carrier);
       span_iso "relation left identity" (comp (Constructions.Spans.identity F.cat b) r) r;
       span_iso "relation right identity" (comp r (Constructions.Spans.identity F.cat a)) r;
       List.iter (fun value -> match F.view value with
         | F.Pair (x,y) ->
           check "left pair projection" (F.equal (amap (left r) value) x);
           check "right pair projection" (F.equal (amap (right r) value) y)
-        | _ -> assert false) (F.to_list carrier)
+        | _ -> assert false) (F.carrier_to_list carrier)
     ) (F.powerset (F.cartesian_prod a b))) objects) objects;
   let s = ints [1] in
   reject "nonpair relation" malformed (R.relation_span ~left:s ~right:s (ints [1]));
@@ -112,7 +112,7 @@ let test_relation_admission () =
   let nested_left = F.tag 0 (F.atom 1) and nested_right = F.pair (F.atom 1) F.terminal in
   let carrier = F.singleton (F.pair nested_left nested_right) in
   let r = relation (F.singleton nested_left) carrier (F.singleton nested_right) in
-  check "nested closed-universe relation" (F.seteq (get (R.image r)) carrier)
+  check "nested closed-universe relation" (F.equal_carrier (get (R.image r)) carrier)
 
 let test_relational_composition () =
   List.iter (fun a -> List.iter (fun b -> List.iter (fun c ->
@@ -122,11 +122,11 @@ let test_relational_composition () =
       let result = comp next previous in
       span_endpoints "composition endpoints" result a c;
       check "composition direct existential image"
-        (F.seteq (get (R.image result)) (direct_relational_image a r b s c));
+        (F.equal_carrier (get (R.image result)) (direct_relational_image a r b s c));
       check "composition witness cardinality"
         (F.cardinality (source result) = List.length (matching_witnesses previous next));
       check "composition projected witness image"
-        (F.seteq (get (R.image result)) (image_oracle previous next))
+        (F.equal_carrier (get (R.image result)) (image_oracle previous next))
     ) (F.powerset (F.cartesian_prod b c))) (F.powerset (F.cartesian_prod a b))
   ) objects) objects) objects
 
@@ -141,12 +141,12 @@ let test_span_laws () =
   check "endo span enumeration" (List.length spans = 25);
   let id = Constructions.Spans.identity F.cat base in
   span_endpoints "identity span" id base base;
-  check "identity image diagonal" (F.seteq (get (R.image id)) (pairs [1,1;2,2]));
+  check "identity image diagonal" (F.equal_carrier (get (R.image id)) (pairs [1,1;2,2]));
   List.iter (fun r ->
     span_iso "left identity span" (comp id r) r;
     span_iso "right identity span" (comp r id) r
   ) spans;
-  let empty_id = Constructions.Spans.identity F.cat F.emptyset in
+  let empty_id = Constructions.Spans.identity F.cat F.empty in
   check "empty identity witnesses" (F.is_empty (source empty_id));
   List.iter (fun r -> List.iter (fun s -> List.iter (fun t ->
     incr associations;
@@ -154,10 +154,10 @@ let test_span_laws () =
     let lhs = comp t rs and rhs = comp st r in
     span_iso "associative witness span" lhs rhs;
     check "associative extensional images"
-      (F.seteq (get (R.image lhs)) (get (R.image rhs)));
+      (F.equal_carrier (get (R.image lhs)) (get (R.image rhs)));
     let paths = List.fold_left (fun count (_,y) ->
       count + List.length (List.filter (fun z ->
-        F.equal (amap (right s) y) (amap (left t) z)) (F.to_list (source t))))
+        F.equal (amap (right s) y) (amap (left t) z)) (F.carrier_to_list (source t))))
       0 (matching_witnesses r s) in
     check "associative path witnesses"
       (F.cardinality (source lhs) = paths && F.cardinality (source rhs) = paths)
@@ -169,14 +169,14 @@ let test_multiplicity_and_snapshots () =
   let s = relation b (pairs [3,6;4,6]) c in
   let result = comp s r in
   check "two paths retain two witnesses" (F.cardinality (source result) = 2);
-  check "two paths have one image pair" (F.seteq (get (R.image result)) (pairs [1,6]));
+  check "two paths have one image pair" (F.equal_carrier (get (R.image result)) (pairs [1,6]));
   check "image does not normalize span" (F.cardinality (source result) = 2);
   span_iso "multiplicity under identity"
     (comp (Constructions.Spans.identity F.cat c) result) result;
   let witnesses = ints [10;20] in
   let count = ref 0 in
-  let f = get (F.arrow witnesses (fun _ -> incr count; F.atom 1) a) in
-  let g = get (F.arrow witnesses (fun _ -> incr count; F.atom 3) (ints [3])) in
+  let f = get (F.morphism witnesses (fun _ -> incr count; F.atom 1) a) in
+  let g = get (F.morphism witnesses (fun _ -> incr count; F.atom 3) (ints [3])) in
   let raw = get (Constructions.Spans.span F.cat f g) in
   let next = relation (ints [3]) (pairs [3,6]) c in
   let result = comp next raw in
@@ -185,8 +185,8 @@ let test_multiplicity_and_snapshots () =
   check "relation operations do not replay source callbacks" (!count = 4);
   check "distinct input witnesses retained" (F.cardinality (source result) = 2);
   let reordered = get (Constructions.Spans.span F.cat
-    (get (F.arrow (ints [20;10]) (fun _ -> F.atom 3) (ints [4;3])))
-    (get (F.arrow (ints [10;20]) (fun _ -> F.atom 6) c))) in
+    (get (F.morphism (ints [20;10]) (fun _ -> F.atom 3) (ints [4;3])))
+    (get (F.morphism (ints [10;20]) (fun _ -> F.atom 6) c))) in
   let prior = relation a (pairs [1,3]) (ints [3;4]) in
   let result = comp reordered prior in
   span_endpoints "extensional intermediate" result a c;
@@ -204,7 +204,7 @@ let test_custom_equality_and_failures () =
     (Abs.singleton (Abs.pair (Abs.atom (-2)) (Abs.atom (-3))))) in
   let result = get (Constructions.Spans.compose AbsL.complete_finset s r) in
   check "custom equality membership and intermediate objects"
-    (Abs.seteq (get (AbsR.image result)) (Abs.singleton (Abs.pair (Abs.atom 1) (Abs.atom 3))));
+    (Abs.equal_carrier (get (AbsR.image result)) (Abs.singleton (Abs.pair (Abs.atom 1) (Abs.atom 3))));
   let a = ints [1] and b = ints [3] and c = ints [6] in
   let r = relation a (pairs [1,3]) b in
   let s = relation (ints [4]) (pairs [4,6]) c in
@@ -262,15 +262,15 @@ let test_book_example () =
   let result = comp s r in
   span_endpoints "book composition projections" result a c;
   check "book four witnesses" (F.cardinality (source result) = 4);
-  check "book three-pair image" (F.seteq (get (R.image result)) (pairs [1,6;2,6;2,7]));
+  check "book three-pair image" (F.equal_carrier (get (R.image result)) (pairs [1,6;2,6;2,7]));
   let fibre x y = List.filter (fun w ->
     F.equal (amap (left result) w) (F.atom x) &&
-    F.equal (amap (right result) w) (F.atom y)) (F.to_list (source result)) in
+    F.equal (amap (right result) w) (F.atom y)) (F.carrier_to_list (source result)) in
   check "book duplicate 2-to-6 witnesses" (List.length (fibre 2 6) = 2);
   let witnesses = ints [10;11;12;13] in
-  let f = get (F.arrow witnesses (fun x -> match F.view x with
+  let f = get (F.morphism witnesses (fun x -> match F.view x with
     | F.Atom 10 -> F.atom 1 | _ -> F.atom 2) a) in
-  let g = get (F.arrow witnesses (fun x -> match F.view x with
+  let g = get (F.morphism witnesses (fun x -> match F.view x with
     | F.Atom 13 -> F.atom 7 | _ -> F.atom 6) c) in
   span_iso "book explicit witness comparison" result (get (Constructions.Spans.span F.cat f g))
 

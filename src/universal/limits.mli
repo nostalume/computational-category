@@ -108,6 +108,7 @@ type ('d,'da,'c,'ca) colimit_structure = {
 val fixed_colimit : ('o,'a) Foundations.Category.cat -> Diagrams.graph -> ('o,'a) colimit ->
   (('o,'a) Diagrams.diagram,('o,'a) Diagrams.diagram_arrow,
    ('o,'a) Diagrams.cocone,('o,'a) Diagrams.cocone_map) colimit_structure
+val adjunction : ('d,'da,'c,'ca) colimit_structure -> ('d,'da,'c,'ca) Adjunction.adjunction
 end
 module Cofree : sig
 type ('d,'da,'c,'ca) limit_structure = {
@@ -119,4 +120,19 @@ type ('d,'da,'c,'ca) limit_structure = {
 val fixed_limit : ('o,'a) Foundations.Category.cat -> Diagrams.graph -> ('o,'a) limit ->
   (('o,'a) Diagrams.diagram,('o,'a) Diagrams.diagram_arrow,
    ('o,'a) Diagrams.cone,('o,'a) Diagrams.cone_map) limit_structure
+val adjunction : ('d,'da,'c,'ca) limit_structure -> ('c,'ca,'d,'da) Adjunction.adjunction
+end
+
+module Chain : sig
+  (* Exercise 7. The supplier promises an invertible tail after the first iso.
+     Search inspects at most bound arrows. Requests beyond index bound fail;
+     requested tail inverses and candidate prefix equations are checked, not
+     arbitrary infinite tails. A factor candidate must be a compatible full
+     omega-cocone; that global law is a premise. Callbacks must terminate. *)
+  type ('o,'a) terminating = {
+    apex:'o;cutoff:int;leg:int -> ('a,error) result;
+    factor:'o -> (int -> ('a,error) result) -> ('a,error) result;
+  }
+  val terminating : isomorphisms:('o,'a) iso_cat -> bound:int ->
+    (int -> ('a,error) result) -> (('o,'a) terminating,error) result
 end

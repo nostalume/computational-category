@@ -22,25 +22,25 @@ module Make :
   functor (I : INDEXED) ->
     sig
       type obj
-      type arrow
+      type indexed_morphism
       val index : obj -> I.base_obj
       val value : obj -> I.fiber_obj
-      val source : arrow -> obj
-      val target : arrow -> obj
-      val base_map : arrow -> I.base_arr
-      val fiber_map : arrow -> I.fiber_arr
+      val source : indexed_morphism -> obj
+      val target : indexed_morphism -> obj
+      val base_map : indexed_morphism -> I.base_arr
+      val fiber_map : indexed_morphism -> I.fiber_arr
       val object_ :
         I.base_obj ->
         I.fiber_obj -> (obj, Foundations.Category.error) result
       val equal_object : obj -> obj -> bool
-      val arrow :
+      val indexed_morphism :
         obj ->
         I.base_arr ->
         I.fiber_arr ->
-        obj -> (arrow, Foundations.Category.error) result
-      val category : (obj, arrow) Foundations.Category.cat
+        obj -> (indexed_morphism, Foundations.Category.error) result
+      val category : (obj, indexed_morphism) Foundations.Category.cat
       val projection :
-        (obj, arrow, I.base_obj, I.base_arr)
+        (obj, indexed_morphism, I.base_obj, I.base_arr)
         Foundations.Functor.cat_functor
       val cocomplete :
         (I.base_obj, I.base_arr) Universal.Limits.cocomplete_cat ->
@@ -54,7 +54,7 @@ module Make :
           Universal.Limits.colimiting_cocone,
           Foundations.Category.error)
          result) ->
-        (obj, arrow) Universal.Limits.cocomplete_cat
+        (obj, indexed_morphism) Universal.Limits.cocomplete_cat
       type right_adjoint = {
         right :
           (I.fiber_obj, I.fiber_arr, I.fiber_obj, I.fiber_arr)
@@ -89,5 +89,5 @@ module Make :
          Universal.Limits.complete_cat) ->
         (I.base_arr ->
          (right_adjoint, Foundations.Category.error) result) ->
-        (obj, arrow) Universal.Limits.complete_cat
+        (obj, indexed_morphism) Universal.Limits.complete_cat
     end

@@ -1,0 +1,6 @@
+open Computational_category
+(* Must fail: the capability is abstract, not a forgeable record. *)
+let raw : (unit,unit,unit,unit) Universal.Adjunction.adjunction =
+  {left=Foundations.Functor.id_functor Constructions.Elementary.one;
+   right=Foundations.Functor.id_functor Constructions.Elementary.one;
+   choose=(fun () -> assert false)}

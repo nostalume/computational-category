@@ -1,5 +1,13 @@
 # Chapter 5 constructions and exercise solutions
 
+## Context
+
+Chapter 5 assembles the earlier arrows and universal maps into reusable
+categories: comma objects, functor categories, indexed families, graphs, and
+rewriting systems. The important deduction is compositional: each new object
+is an endpoint-checked instance of an existing category or universal
+construction, rather than a second representation of the same mathematics.
+
 This chapter extends the OCaml learning library with category constructions and
 their inherited finite universal maps. The source is Rydeheard and Burstall,
 *Computational Category Theory*, Chapter 5, printed pp. 103–126. Exercise numbers
@@ -39,7 +47,7 @@ module G = Instances.Finite_graphs.Make (F)
 let get = function Ok x -> x | Error _ -> failwith "example admission failed"
 let value = F.atom
 let graph nodes edges =
-  get (G.graph ~nodes:(F.of_list (List.map value nodes))
+  get (G.graph ~nodes:(F.carrier_of_list (List.map value nodes))
     ~edges:(List.map (fun (e,s,t) -> value e, value s, value t) edges))
 
 let () =
@@ -96,7 +104,7 @@ one. Preservation and universal uniqueness remain mathematical caller premises.
 
 ### Finite graphs and the book pushout
 
-A graph is (E,inc,N), with inc : E → N × N. A graph arrow is an edge map and
+A graph is (E,inc,N), with inc : E → N × N. A graph morphism is an edge map and
 a node map preserving incidence. Thus FinGraph = (Id,X), where X(N)=N×N.
 `Instances.Finite_graphs.Make(F)` instantiates this comma category, its finite
 (co)completeness, and products.
@@ -105,6 +113,19 @@ This differs from `Universal.Diagrams.graph`: the latter is a finite **labelled 
 shape**, while `G.graph` is an object of the category of finite multigraphs.
 Its explicit finite edge bindings retain loops, isolated nodes and parallel edges.
 Node/edge sets use F's equality; duplicate edge identifiers are rejected.
+
+The owner-specific API is `graph_morphism src ~edges ~nodes tgt`; its
+constructor checks both graph endpoints and the incidence square. The
+fixed-node subcategory uses `Fixed.fixed_morphism`. Labelled graphs use
+`Labelled.labelled_morphism` and expose `underlying_morphism` for forgetting
+labels. These names distinguish graph-owned morphisms from the generic
+`Constructions.Comma.arrow`, whose shorter name remains the direct abstract
+comma construction.
+
+In definition form, a graph morphism `(e,n):G→H` is admitted exactly when
+`inc_H ∘ e = (n × n) ∘ inc_G`; the implementation delegates the product and
+composition checks to the supplied finite category capabilities rather than
+re-proving them in the graph layer.
 
 The book's graph pushout (pp. 110–113) has four nodes and five edges. Its OCaml
 regression constructs the input graphs and maps, computes the pushout and checks
@@ -119,8 +140,8 @@ It checks identities, endpoints, closure and associativity over that enumeration
 The enumeration must cover the **intended** finite category or chosen closed
 subcategory; it does not discover every object/arrow of an ambient category.
 
-`functor_` snapshots object/arrow maps once per admitted key and checks
-identity, endpoints and composition. `natural` snapshots components and checks
+`finite_functor` snapshots object/arrow maps once per admitted key and checks
+identity, endpoints and composition. `natural_transformation` snapshots components and checks
 every naturality square. Equality is extensional on the admitted source, not
 equality of callbacks. `category` uses vertical composition;
 `horizontal` constructs the diagonal described on pp. 114–116:
@@ -219,18 +240,20 @@ sides gives the usual limit functor into C.
 Program surface: `Constructions.Functor_category.diagonal` and comma builders for finite J;
 `Universal.Limits.map_limit` takes the base morphism and two already calculated
 limiting cones and returns the admitted variable-base cone map.
-It retains checked failure propagation rather than making a possibly failing
-colimit/limit computation a falsely total object callback. Tests cover the
-comma representation and identity map; the argument above gives composition.
+General functor object maps now return `result`, as arrow maps do; chosen
+colimit/limit computations need no falsely total object callback. This explicit
+universal-map operation remains useful when the two cones are already known.
+Tests cover the comma representation and identity map; the argument above
+gives composition.
 
 ## Exercise 3 Products of graphs
 
 Source: p. 106. For G and H, take nodes N_G×N_H and edges E_G×E_H.
 The edge (e,f) has source (s_G(e),s_H(f)) and target (t_G(e),t_H(f)).
-The projections preserve incidence, so they are graph arrows.
+The projections preserve incidence, so they are graph morphisms.
 
-For graph arrows u : K → G and v : K → H, pair their edge maps and their
-node maps. The pair is a graph arrow because both source/target equations
+For graph morphisms u : K → G and v : K → H, pair their edge maps and their
+node maps. The pair is a graph morphism because both source/target equations
 hold componentwise. It factors through both projections; any other factor
 has the same edge and node coordinates and therefore equals it.
 
@@ -369,7 +392,7 @@ in (Edges,K_A). The Edges projection preserves graph colimits because the
 edge sets and universal maps in the graph colimit are the corresponding
 FinSet colimits. Hence Theorem 3 applies.
 
-Program: `Instances.Finite_graphs.Make(F).labelled`, `labelled_arrow`,
+Program: `Instances.Finite_graphs.Make(F).labelled`, `labelled_morphism`,
 `labelled_category` and `labelled_cocomplete`.
 The implementation retains the graph construction's edge colimit evidence;
 its universal map creates the output labels. A quotient cannot identify
@@ -421,7 +444,10 @@ For a following (h,k), composition is (h∘f, k∘T_h(g)).
 Strictness makes its source T_(h∘f)(x). Identity and associativity follow
 from functoriality of F and the fiber category laws.
 
-Program: `Constructions.Indexed.Make(I)` admits indexed objects and arrows.
+Program: `Constructions.Indexed.Make(I)` admits indexed objects and
+`indexed_morphism` values. Its constructor checks base endpoints, transport,
+fiber membership, and transported fiber endpoints before returning the
+result-valued morphism.
 `valid_object` owns fiber membership; each selected fiber's dictionary checks
 payload endpoints and equality. All fibers use one OCaml object/arrow
 representation. General dependent/heterogeneous fibers are covered by the
@@ -511,4 +537,3 @@ nonidentity indexed transport. Mathematical proofs above establish their stated
 conclusions under their assumptions; finite tests provide bounded implementation
 evidence. Neither proves the supplied callback laws or certifies all platforms,
 unbounded work, arbitrary higher-universe encodings or formal correctness.
-

@@ -1,0 +1,2 @@
+open Computational_category
+let raw : (unit,unit) Constructions.Algebras.algebra = {carrier=();structure=()}

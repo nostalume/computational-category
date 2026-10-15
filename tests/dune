@@ -5,7 +5,9 @@
 
 (tests
  (names foundations_test universal_test spans_relations_test
-        constructions_test functor_category_test indexed_test)
+        constructions_test functor_category_test indexed_test adjunction_test algebras_test topos_test
+        finite_slice_functor_graph_test term_unification_test presentations_test)
  (modules foundations_test universal_test spans_relations_test
-          constructions_test functor_category_test indexed_test)
+          constructions_test functor_category_test indexed_test adjunction_test algebras_test topos_test
+          finite_slice_functor_graph_test term_unification_test presentations_test)
  (libraries category_test_support computational_category))

@@ -281,6 +281,13 @@ module Free = struct
           Diagrams.cocone_map c.colim_cocone base (Diagrams.cocone_apex_arrow u) other in
       Ok (c.colim_cocone,diagrams.ident d,factor) in
     {diagrams;cocones;base_object=Diagrams.cocone_base;base_arrow=Diagrams.cocone_map_base;free}
+  let adjunction structure =
+    let right = {Foundations.Functor.f_dom=structure.cocones;f_cod=structure.diagrams;
+      f_omap=(fun c -> Ok (structure.base_object c));
+      f_amap=(fun a -> Ok (structure.base_arrow a))} in
+    Adjunction.of_universal ~right (fun d ->
+      let* free_object,unit_arrow,factor = structure.free d in
+      Ok {Adjunction.free_object;unit_arrow;factor})
 end
 module Cofree = struct
   type ('d,'da,'c,'ca) limit_structure = {
@@ -306,5 +313,63 @@ module Cofree = struct
           Diagrams.cone_map other base (Diagrams.cone_apex_arrow u) c.lim_cone in
       Ok (c.lim_cone,limit_diagrams.ident d,factor) in
     {limit_diagrams;cones;cone_base=Diagrams.cone_base;cone_base_arrow=Diagrams.cone_map_base;cofree}
+  let adjunction structure =
+    let left = {Foundations.Functor.f_dom=structure.cones;f_cod=structure.limit_diagrams;
+      f_omap=(fun c -> Ok (structure.cone_base c));
+      f_amap=(fun a -> Ok (structure.cone_base_arrow a))} in
+    Adjunction.dual (Adjunction.of_universal ~right:(Foundations.Functor.dual_functor left)
+      (fun d -> let* free_object,unit_arrow,factor = structure.cofree d in
+        Ok {Adjunction.free_object;unit_arrow;factor}))
 
+end
+
+module Chain = struct
+  type ('o,'a) terminating = {
+    apex:'o;cutoff:int;leg:int -> ('a,error) result;
+    factor:'o -> (int -> ('a,error) result) -> ('a,error) result;
+  }
+  let terminating ~isomorphisms ~bound chain =
+    let cat = isomorphisms.iso_cat in
+    if bound<0 then Error (Outside_domain "chain: negative bound") else
+    let rec search n previous prefix =
+      if n>=bound then Error (Iteration_limit bound) else
+      let* h = chain n in
+      if (match previous with None -> false | Some p -> not (cat.equal_obj (cat.target p) (cat.source h)))
+      then Error (Non_composable "chain: adjacent endpoints") else
+      let* inv = inverse isomorphisms h in
+      match inv with None -> search (n+1) (Some h) (h::prefix)
+      | Some _ ->
+        let apex = cat.source h in
+        let* legs = List.fold_left (fun state p ->
+          let* legs = state in
+          let* leg = compose cat (List.hd legs) p in Ok (leg::legs))
+          (Ok [cat.ident apex]) prefix in
+        let legs = Array.of_list legs in
+        let leg i =
+          if i<0 then Error (Outside_domain "chain: negative index")
+          else if i>bound then Error (Iteration_limit bound)
+          else if i<=n then Ok legs.(i) else
+            let rec tail j object_ map =
+              if j=i then Ok map else
+              let* h = chain j in
+              if not (cat.equal_obj object_ (cat.source h)) then
+                Error (Non_composable "chain: tail endpoints") else
+              let* k = inverse isomorphisms h in match k with
+              | None -> Error (Outside_domain "chain: tail not invertible")
+              | Some k -> let* map = compose cat map k in tail (j+1) (cat.target h) map in
+            tail n apex (cat.ident apex) in
+        let factor target candidate =
+          let rec check i previous =
+            let* u = candidate i in
+            let* l = leg i in
+            if not (has_endpoints cat u (cat.source l) target) then
+              Error (Non_composable "chain candidate: endpoints") else
+            let* () = match previous with None -> Ok () | Some p ->
+              let* edge = chain (i-1) in let* composite = compose cat u edge in
+              if cat.equal_arr composite p then Ok ()
+              else Error (Non_commuting "chain candidate") in
+            if i=n then Ok u else check (i+1) (Some u) in
+          check 0 None in
+        Ok {apex;cutoff=n;leg;factor} in
+    search 0 None []
 end

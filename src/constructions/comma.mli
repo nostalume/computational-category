@@ -3,6 +3,23 @@
    equality or automatic proof of functor/preservation laws is performed. *)
 type ('oa, 'ac, 'ob) obj
 type ('oa, 'aa, 'ac, 'ob, 'ab) arrow
+(* Adjoint hom-set bijection as a projection-preserving comma isomorphism. *)
+val adjunction_forward : ('b,'bb,'a,'aa) Universal.Adjunction.adjunction ->
+  (('b,'aa,'a) obj,('b,'bb,'aa,'a,'aa) arrow,
+   ('b,'bb,'a) obj,('b,'bb,'bb,'a,'aa) arrow) Foundations.Functor.cat_functor
+val adjunction_backward : ('b,'bb,'a,'aa) Universal.Adjunction.adjunction ->
+  (('b,'bb,'a) obj,('b,'bb,'bb,'a,'aa) arrow,
+   ('b,'aa,'a) obj,('b,'bb,'aa,'a,'aa) arrow) Foundations.Functor.cat_functor
+(* Forward/backward must be inverse lawful functors preserving both projections.
+   Selected unit/counit projection observations are checked when used. *)
+val adjunction_of_isomorphism :
+  left:('b,'bb,'a,'aa) Foundations.Functor.cat_functor ->
+  right:('a,'aa,'b,'bb) Foundations.Functor.cat_functor ->
+  forward:(('b,'aa,'a) obj,('b,'bb,'aa,'a,'aa) arrow,
+    ('b,'bb,'a) obj,('b,'bb,'bb,'a,'aa) arrow) Foundations.Functor.cat_functor ->
+  backward:(('b,'bb,'a) obj,('b,'bb,'bb,'a,'aa) arrow,
+    ('b,'aa,'a) obj,('b,'bb,'aa,'a,'aa) arrow) Foundations.Functor.cat_functor ->
+  ('b,'bb,'a,'aa) Universal.Adjunction.adjunction
 val left_object : ('a, 'b, 'c) obj -> 'a
 val right_object : ('a, 'b, 'c) obj -> 'c
 val connecting_arrow : ('a, 'b, 'c) obj -> 'b
