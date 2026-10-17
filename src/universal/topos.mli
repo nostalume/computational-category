@@ -1,9 +1,11 @@
+(** A subobject classifier and its truth arrow. *)
 type ('o,'a) classifier = {
   omega : 'o;
   truth : 'a;
   character : 'a -> ('a, Foundations.Category.error) result;
 }
 
+(** The finite categorical capabilities required by a topos instance. *)
 type ('o,'a) topos = {
   topos_cat : ('o,'a) Foundations.Category.cat;
   topos_initial : ('o,'a) Limits.initial_obj;

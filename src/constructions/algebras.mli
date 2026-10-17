@@ -1,7 +1,9 @@
-(* All values and supplied universal capabilities describe the same lawful,
-   stable endofunctor F:C->C. Construction checks endpoints/squares, not global
-   functor or universal laws. Errors and supplier exceptions propagate. *)
+(* Algebras and algebra morphisms for one lawful, stable endofunctor
+   [F : C -> C]. Constructors check endpoints and squares; global functor and
+   universal laws remain caller premises. *)
+(* An object equipped with a structure arrow [F(a) -> a]. *)
 type ('o,'a) algebra
+(* A commuting square between two algebra structures. *)
 type ('o,'a) algebra_morphism
 val carrier : ('o,'a) algebra -> 'o
 val structure : ('o,'a) algebra -> 'a

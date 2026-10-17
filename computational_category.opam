@@ -23,6 +23,7 @@ depends: [
 
 x-maintain-files: [
   "README.md"
+  "LICENSE"
   "dune-project"
   "src"
   "tests"

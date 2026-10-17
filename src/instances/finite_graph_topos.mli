@@ -1,6 +1,5 @@
-(* Finite directed-graph exponentials and classifiers.  They are computed for
-   the repository's incidence
-   orientation: edges map to (source,target) node pairs. *)
+(** Finite directed-graph exponentials and classifiers. They use the incidence
+    orientation in which edges map to [(source,target)] node pairs. *)
 module Make (F : Finite_sets.S) : sig
   type graph
   type graph_morphism

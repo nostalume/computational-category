@@ -1,20 +1,43 @@
-# Chapters 2–4: finite carriers, categories, and universal constructions
+# Finite carriers, categories, and universal constructions
 
-## Context
+## Foreword
 
-These definitions are the executable foundation for every later construction.
-The book begins with sets and arrows, but a program must also decide which
-values are equal, when a callback is admissible, and how a universal mediator
-is obtained. This guide makes those decisions explicit before introducing
-more elaborate categorical objects.
+The first categorical programs need more than a collection type. They need a
+stable notion of equality, total arrows between admitted objects, and a way to
+turn a universal definition into a terminating operation. These choices control
+all later constructions: a product, graph, relation, adjunction, or topos can
+only be as reliable as its objects and arrows.
 
-This guide describes the **current target API** implemented by
-`Instances.Finite_sets.Make`. The names follow the mathematical reduction used
-in the book; the source, tests, and examples use the same vocabulary. The
-book supplies the definitions, while the package supplies a finite,
-equality-driven execution of them.
+This guide derives the executable representation from the mathematics in three
+steps: define the object or arrow, reduce its laws to finite checks, then expose
+the smallest API that preserves those laws. The implementation is finite and
+'equality-driven'; it does not add a hash or ordering assumption that the
+mathematics did not provide.
 
-## First path
+## A. Values and carriers
+
+A finite carrier is an extensional finite collection of values. With an atom
+equality `≈`, the mathematical membership and equality relations are
+
+```text
+x ∈ A       iff  ∃a∈A. x ≈ a
+A = B       iff  (∀x. x∈A ⇔ x∈B)
+```
+
+A program must retain one representative for each equality class. Therefore the
+representation is an immutable admitted snapshot, not the input list itself:
+
+```text
+admit(xs)          = one representative per ≈-class
+enumerate(A)       = the admitted representatives
+map(f,A)           = admit(f(x) for x in enumerate(A))
+```
+
+Values form a closed recursive universe of atoms, tags, pairs, and a terminal
+value. The equality supplied for atoms must be stable and terminating. No
+structural equality, hash, or ordering is inferred.
+
+The API follows directly:
 
 ```ocaml
 open Computational_category
@@ -28,137 +51,98 @@ let values = F.carrier_of_list [F.atom 1; F.atom 2; F.atom 1]
 let () = assert (F.cardinality values = 2)
 ```
 
-`carrier_of_list` keeps one representative from each supplied equality class.
-The representation is immutable to callers; implementation arrays are only an
-internal storage choice.
+`carrier_to_list` is an operational mediation for algorithms that need a finite
+iteration. It is not a mathematical operation or a canonical ordering.
 
-## Chapter 2 — values and finite carriers
+### Representation and cost
 
-The finite-set owner exposes:
+Equality-only membership and arbitrary evaluation are linear in the admitted
+carrier. Admission and extensional reconciliation can be quadratic in the
+worst case because certifying pairwise distinctness may require every pairwise
+comparison. Subquadratic behavior would require a compatible hash/order law or
+a different equality contract. The implementation therefore reuses positions
+only when they are already known and keeps the equality-driven fallback.
 
-```text
-carrier_of_list(xs)  = admit one representative per equality class
-carrier_to_list(S)   = enumerate the admitted representatives
-mem(x,S)             = ∃ y∈S. equal(x,y)
-equal_carrier(S,T)   = mutual membership
-map_carrier(f,S)     = carrier_of_list(map f (carrier_to_list S))
-```
+## B. Arrows and categories
 
-Values are atoms, tagged values, pairs, or the terminal value. `ATOM.equal`
-must be stable and terminating; no hash, order, or host-language structural
-equality is assumed. Set operations (`union`, `inter`, `diff`, products,
-disjoint unions, powersets, and splits) always re-admit their result.
-
-The recursive reduction for the Chapter 2 exercises remains direct:
+A finite arrow `f : A → B` is a total function whose image is contained in `B`.
+The admission rule is
 
 ```text
-fold(op,e,[])     = e
-fold(op,e,x::xs)  = op(x, fold(op,e,xs))
+for every x∈A:
+  y := f(x)
+  require y∈B
 ```
 
-## Chapter 3 — morphisms and categories
-
-A finite morphism is a checked total function between carriers. Construction
-freezes one callback result per domain representative:
+The callback is sampled once per admitted source representative and the result
+is frozen. This deduction yields a dense table indexed by the source carrier:
 
 ```text
-morphism_result(A, f, B):
-  for i = 0 … cardinality(A)-1:
-    y := f(A[i])
-    require mem(y,B)
-    table[i] := y
-  return { dom=A; cod=B; table }
+morphism_result(A,f,B) = { domain=A; codomain=B; table[i]=f(A[i]) }
 ```
 
-`morphism A f B` is the exception-free specialization. The public operations
-are `domain`, `codomain`, `eval`, `identity`, `compose`, and
-`equal_morphism`. `eval` accepts any value equal to a domain representative and
-returns the frozen table entry; an outside value is a typed
-`Outside_domain` error. A non-member image is `Outside_codomain`.
+`domain`, `codomain`, `eval`, `identity`, `compose`, and `equal_morphism` are
+therefore the direct API. `eval` accepts a value equal to an admitted domain
+representative and returns its frozen image; an outside value returns
+`Outside_domain`.
 
-Composition checks `equal_carrier (codomain f) (domain g)` and then builds a
-new frozen table by evaluating `f` followed by `g`. Equality compares
-endpoint carriers and all domain images. Since the atom contract provides
-equality but not hashing, external lookup is equality-driven; composition and
-equality iterate the admitted domain table directly.
-
-### Complexity boundary
-
-With equality-only atoms, `mem` and arbitrary `eval` are linear in the admitted
-carrier. Admission and extensional carrier comparison remain quadratic in the
-worst case. The implementation avoids redundant list/array conversions and
-reuses the indexed first morphism table during composition, but it does not
-claim constant-time lookup or subquadratic equality reconciliation. Powersets
-and finite function spaces retain their inherent finite-output growth.
-
-`carrier_to_list` is deliberately an operational mediation, not a mathematical
-operation: it exposes the finite representatives to list-oriented host code.
-It should occur at algorithm or test boundaries, not in the definition of a
-carrier or morphism. The remaining bounds are not merely an implementation
-oversight. In the equality-query model, certifying that `n` supplied values
-are pairwise distinct can require comparing every pair (Ω(n²)); locating an
-arbitrary value in an `n`-element carrier likewise has a linear worst case.
-Thus `carrier_of_list`, extensional carrier equality, and deduplicating union
-cannot all become subquadratic without adding a compatible hash/order law or
-changing the representation contract. Safe further reductions are local:
-reuse known source positions (as composition already does), add cheap length
-guards, and cache a transaction-local reconciliation when many queries reuse
-the same carriers. None of these changes the mathematical equality contract.
-
-Universal-construction owners may use the finite instance's namespaced
-`Private` position hooks when they already possess indices from the same
-carrier. Product projections therefore materialize their `n*m` table once
-instead of rechecking each projection by target membership; coequalizer
-partitioning and quotient maps reuse the positions computed during admission.
-The equality-driven fallback remains in place when endpoint representations are only
-extensionally equal rather than physically shared.
-
-The abstract category dictionary remains the executable record
-`(source,target,ident,comp,equal_obj,equal_arr)`. The finite instance adapts
-`domain`, `codomain`, `identity`, and `equal_morphism` to that dictionary.
-The record is a supplied capability: constructing it does not prove the
-category laws.
-
-Functor and diagram pseudocode follows the same result-valued boundary:
+Composition is ordinary categorical composition:
 
 ```text
-map_object(F,A) = result object
-map_arrow(F,f)  = result morphism
-admit_diagram(shape, objects, arrows) = endpoint-checked assignment
-admit_cocone(D, apex, sides) = diagram + commuting equations
+compose(g,f)(x) = g(f(x))
 ```
 
-## Chapter 4 — chosen universals and relations
+It first checks that the codomain of `f` and domain of `g` are extensionally
+equal, then reuses the first table's positions while constructing the result.
+The generic category record supplies `source`, `target`, `ident`, `comp`, and
+the two equality operations; constructing that record does not prove its laws.
 
-Universal records store a chosen object, legs, and a mediator operation. For a
+## C. Universal constructions
+
+A universal object is not just a value. It is a chosen object, its structural
+legs, and a mediator operation whose equations are checked at admission. For a
 product:
 
 ```text
-product(A,B) = (P, p1:P→A, p2:P→B, pair)
+product(A,B) = (P, p1:P→A, p2:P→B)
 pair(X,f,g)  = u:X→P
 require p1∘u=f and p2∘u=g
 ```
 
-The package implements the corresponding coproduct, equalizer, coequalizer,
-pushout, pullback, and finite (co)limit owners. Uniqueness is checked only for
-the finite candidates enumerated by tests; it is not a generic runtime proof.
+The same reduction gives coproducts, equalizers, coequalizers, pushouts,
+pullbacks, and finite diagram limits/colimits. The finite implementation uses
+indexed product tables and quotient representatives where that reduces repeated
+membership work, while preserving the public equality contract.
 
-Relations retain witnesses as spans. Composition pulls back matching
-endpoints, and `image` maps witnesses to endpoint pairs before re-admitting the
-result carrier. Empty relations retain their declared endpoint carriers.
+A universal property supplies uniqueness mathematically. Tests enumerate finite
+candidate mediators to falsify an incorrect implementation; they do not turn a
+finite enumeration into a proof for every category supplied by a caller.
 
-## Ownership and evidence
+## D. Relations and spans
 
-| Role | Owner |
-|---|---|
-| values, carriers, finite morphisms | `src/instances/finite_sets.ml` |
-| category dictionary and errors | `src/foundations/category.ml` |
-| diagrams and universal records | `src/universal/` |
-| witness-bearing spans and relations | `src/constructions/spans.ml`, `src/instances/finite_relations.ml` |
+A relation from `A` to `B` is represented by a span
 
-The focused evidence is in `tests/foundations_test.ml`,
-`tests/universal_test.ml`, `tests/constructions_test.ml`, and
-`tests/spans_relations_test.ml`. It exercises representative equality,
-endpoint failures, frozen callback evaluation, composition, and universal
-equations. It cannot prove arbitrary supplied category laws, equality
-termination, or universal uniqueness outside the enumerated finite cases.
+```text
+A <- W -> B
+```
+
+because `W` retains witness multiplicity. Composition forms a pullback over the
+matching endpoint and keeps every compatible witness pair. The extensional
+relation image is a separate operation that maps witnesses to endpoint pairs
+and re-admits the result carrier. Empty relations still retain their declared
+endpoints.
+
+## E. Mathematical-to-code summary
+
+```text
+extensional finite set  -> admitted carrier snapshot
+function A→B            -> frozen checked morphism table
+category law            -> supplied dictionary + checked composition
+universal definition    -> chosen object + legs + result-valued mediator
+relation                -> witness-bearing span
+```
+
+The focused tests exercise equality, failed admission, frozen callbacks,
+composition, universal equations, and witness-preserving relation composition.
+They establish bounded executable evidence, not arbitrary category laws,
+equality termination, or unrestricted universal uniqueness.

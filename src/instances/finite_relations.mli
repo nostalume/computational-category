@@ -1,3 +1,4 @@
+(** Relations represented by endpoint-preserving witness spans. *)
 module Make (F : Finite_sets.S) : sig
   (* Each carrier member is an outer Pair whose components belong to the
      supplied endpoint sets. Empty carriers still retain those endpoints. *)

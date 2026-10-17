@@ -1,6 +1,8 @@
+(** Finite labelled term substitutions used by the book-facing adapter. *)
 type names
 type opr
 type term
+(* Structural view of a term for pattern matching and translation. *)
 type view = Variable of string | Application of opr * (string * term) list
 type substitution
 val names : string list -> names
@@ -13,6 +15,7 @@ val var : string -> term
 val application : opr -> (string -> term) -> (term, Foundations.Category.error) result
 val view : term -> view
 val equal_term : term -> term -> bool
+(* Admit a substitution whose images use only the declared target names. *)
 val substitution :
   names -> (string -> term) -> names -> (substitution, Foundations.Category.error) result
 val apply_term : substitution -> term -> (term, Foundations.Category.error) result

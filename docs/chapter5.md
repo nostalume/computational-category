@@ -19,18 +19,21 @@ separately from executable restrictions: finite enumerated functor domains,
 uniform OCaml fiber representations, and elementary injective graph rewriting.
 The proofs are worked mathematical arguments, not machine-checked certificates.
 
-## Build and first example
+## Mathematical reduction
 
-From the repository root, with the existing OCaml/Dune toolchain:
+Chapter 5 turns universal constructions into reusable categories. A comma
+object is an arrow in a common codomain; a comma morphism is a commuting
+square. A functor category is a family of objects and arrows indexed by a
+source category, with naturality as its defining equation. Graphs are a comma
+instance of an incidence map, and indexed families are slice objects.
 
-```sh
-dune build --cache=disabled --no-config
-dune runtest --cache=disabled --no-config --force
-```
+The code representation follows these deductions: endpoints are admitted before
+squares are checked, finite source domains are snapshotted before naturality is
+tested, and inherited limits/colimits are obtained from the corresponding
+component constructions. Rewriting keeps the graph maps witnessing the double
+pushout rather than returning only a changed graph.
 
-These produce local build artifacts; they do not install or publish anything.
-The tested versions are OCaml 5.2.1 and Dune 3.24.2 on Windows.
-The declared minima (OCaml 4.14, Dune 3.7) remain untested.
+## API example
 
 The following complete example creates two directed multigraphs and their
 product. Link it against the local `computational_category` library.
@@ -114,7 +117,7 @@ shape**, while `G.graph` is an object of the category of finite multigraphs.
 Its explicit finite edge bindings retain loops, isolated nodes and parallel edges.
 Node/edge sets use F's equality; duplicate edge identifiers are rejected.
 
-The owner-specific API is `graph_morphism src ~edges ~nodes tgt`; its
+The graph API is `graph_morphism src ~edges ~nodes tgt`; its
 constructor checks both graph endpoints and the incidence square. The
 fixed-node subcategory uses `Fixed.fixed_morphism`. Labelled graphs use
 `Labelled.labelled_morphism` and expose `underlying_morphism` for forgetting

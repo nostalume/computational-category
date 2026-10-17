@@ -55,7 +55,7 @@ f'       B        p g = p' f'
 
 Then compute `q = coequalizer(p, p' h)` and return `q p'`. Endpoint and
 composition checks are delegated to the supplied category and universal
-owners. The construction is generic; no finite-set-specific quotient is
+capabilities. The construction is generic; no finite-set-specific quotient is
 embedded in it.
 
 ## Generalization

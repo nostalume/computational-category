@@ -1,10 +1,11 @@
-(* Closed finite universes. Atomic values must be immutable and equality a
-   stable terminating equivalence. Callback exceptions propagate unchanged. *)
+(** Closed finite universes. Atomic values must be immutable and equality a
+    stable terminating equivalence. Callback exceptions propagate unchanged. *)
 module type ATOM = sig
   type t
   val equal : t -> t -> bool
 end
 
+(** The equality-owned finite carrier and frozen-morphism interface. *)
 module type S = sig
   type atom
   type value
@@ -19,6 +20,7 @@ module type S = sig
   val equal : value -> value -> bool
   val empty : carrier
   val singleton : value -> carrier
+  (* Admit one representative from each supplied equality class. *)
   val carrier_of_list : value list -> carrier
   val carrier_to_list : carrier -> value list
   val equal_carrier : carrier -> carrier -> bool
@@ -35,6 +37,7 @@ module type S = sig
   val split : carrier -> carrier * carrier
   val singleton_split : carrier -> (value * carrier) option
   val morphism : carrier -> (value -> value) -> carrier -> (morphism, Foundations.Category.error) result
+  (* Freeze a checked total map, preserving result-valued failures. *)
   val morphism_result :
     carrier -> (value -> (value, Foundations.Category.error) result) -> carrier -> (morphism, Foundations.Category.error) result
   val domain : morphism -> carrier

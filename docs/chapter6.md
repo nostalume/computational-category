@@ -374,7 +374,7 @@ Exercise 11 is represented by `Universal.Adjunction.compose`. Given
 and counit. The implementation maps the inner unit through the inner right
 functor and the outer unit through the composite, and dually maps the inner
 counit through the outer left functor. The existing triangle-law admission
-therefore remains the single owner of coherence rather than introducing a
+therefore remains the single capability for coherence rather than introducing a
 second adjunction record.
 
 The focused tests report 506 hom round trips and 11 selected exhaustive
@@ -513,11 +513,11 @@ turn a convenient example into an accidental library contract.
   fixed alphabet, a category of finite deterministic automata and a behavior
   functor whose morphisms are defined. Minimality then needs a finite residual
   equivalence and a chosen quotient. The current finite-graph category supplies
-  none of those owners, so no right-adjoint/minimization API is claimed.
+  none of those capabilities, so no right-adjoint/minimization API is claimed.
 - **14 — monads and tree processing.** From `F ⊣ G` the induced monad is
   `T = G F`, with unit `η` and multiplication `G ε F`. A production tree API
   still needs a polynomial/tree carrier and explicit operations; the current
-  terminating algebra constructors do not provide that owner. The theorem is
+  terminating algebra constructors do not provide that capability. The theorem is
   recorded, but no monad implementation is introduced.
 - **15 — recursively enumerable sets.** This exercise needs an explicit
   enumerator or recursive-function presentation, together with a fair-stream

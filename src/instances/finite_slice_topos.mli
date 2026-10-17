@@ -1,5 +1,5 @@
-(* A finite slice topos Set/B.  The anchor B is fixed for one instance; all
-   constructions are computed fibrewise and return checked slice arrows. *)
+(** A finite slice topos [Set/B]. The anchor [B] is fixed for one instance;
+    constructions are computed fibrewise and return checked slice arrows. *)
 module Make (F : Finite_sets.S) : sig
   type slice_object
   type slice_morphism

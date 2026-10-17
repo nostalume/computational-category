@@ -8,10 +8,9 @@ determine what is asserted, and transport along signature maps explains how
 theories combine. The representation below keeps that dependency visible while
 making closure lazy and backend-owned.
 
-This document is the design contract for the Chapter 9 implementation. It is
-intentionally written before source implementation. The audience is a maintainer
-who must understand the mathematics, the executable boundary, and the reason
-the representation differs from the book.
+The executable theory follows this deduction rather than inheriting the book's
+closed-set representation. Its implementation boundary is stated after the
+mathematical definitions so that the code can be checked against the theory.
 
 The contract generalizes the book's theory of institutions instead of reducing
 it to finite equational theories. Equational logic will be one backend; the
@@ -290,7 +289,7 @@ directions.
 The eventual OCaml interfaces should name operations by their mathematical
 function:
 
-```ocaml
+```text
 module type Constraint_logic = sig
   type signature
   type arrow
@@ -313,9 +312,9 @@ val colimit : ...
 ```
 
 The exact module split remains an implementation decision. The mathematical
-ownership is fixed: signatures own transport, constraints own composition, the
-logic backend owns closure/entailment, and universal constructors own colimit
-certificates.
+boundary is fixed: signatures determine transport, constraints determine
+composition, the logic backend determines closure/entailment, and universal
+constructors determine colimit certificates.
 
 ## 11. Current implementation
 
@@ -329,7 +328,7 @@ application, and the presentation category.
 `tests/presentations_test.ml` supplies a small abstract logic backend to verify
 that these operations do not depend on equational syntax or finite models.
 
-The remaining Chapter 9 owners—concrete institution adapters, generic theory
+The remaining Chapter 9 implementations—concrete institution adapters, generic theory
 colimits, based environments, semantic-operation interpretation, and the full
 Grothendieck construction—are subsequent implementation work. The kernel is
 more general than a finite equational theory and more efficient than eagerly

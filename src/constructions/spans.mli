@@ -1,4 +1,6 @@
+(** A witness object with two legs sharing one source. *)
 type ('o, 'a) span
+(* Admit a span after checking both legs in one category. *)
 val span :
   ('o, 'a) Foundations.Category.cat -> 'a -> 'a -> (('o, 'a) span, Foundations.Category.error) result
 val span_source : ('o, 'a) span -> 'o

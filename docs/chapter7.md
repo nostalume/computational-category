@@ -43,7 +43,7 @@ pretended to follow from an arbitrary OCaml callback.
 The finite-set instance uses two truth values. It provides `false_`, `not_`,
 `and_`, `or_`, `imply_`, the universal quantifier from naming a predicate, and
 an existential quantifier by finite enumeration. Factorization is built from
-the supplied pushout/equalizer owners, not from a second image algorithm.
+the supplied pushout/equalizer capabilities, not from a second image algorithm.
 
 Power objects are represented by the finite exponential `Omega^a`; membership
 is the subobject of `a × Omega^a` where the predicate evaluates to true.

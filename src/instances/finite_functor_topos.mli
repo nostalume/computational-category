@@ -1,5 +1,5 @@
-(* Pointwise finite-set exponentials and classifiers for a discrete finite
-   source category. *)
+(** Pointwise finite-set exponentials and classifiers for a discrete finite
+    source category. *)
 module Make (F : Finite_sets.S) : sig
   type ('o,'a) object_ =
     ('o,'a,F.carrier,F.morphism) Constructions.Functor_category.finite_functor

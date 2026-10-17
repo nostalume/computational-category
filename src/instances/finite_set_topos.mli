@@ -1,6 +1,6 @@
-(* The finite-set topos is a concrete, terminating model of Chapter 7.  Its
-   function values are library-owned tagged graphs; the tag is chosen fresh
-   from the admitted domain/codomain values for each exponential. *)
+(** The finite-set topos is a concrete, terminating model of Chapter 7. Its
+    function values are library-owned tagged graphs; tags are chosen fresh from
+    admitted domain/codomain values for each exponential. *)
 module Make (F : Finite_sets.S) : sig
   type power_object = { power_obj : F.carrier; membership : F.morphism }
 

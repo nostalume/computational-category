@@ -5,6 +5,19 @@ follows the mathematical structure of *Computational Category Theory* while
 keeping runtime representations chosen for equality, sharing, and finite
 computation rather than copying the book's data structures literally.
 
+> **A category-theoretic learning library:** definitions first, executable
+> representations second, and every premise visible at the API boundary.
+
+## Contents
+
+- [What this library provides](#what-this-library-provides)
+- [Build and test](#build-and-test)
+- [First API example](#first-api-example-finite-carriers-and-morphisms)
+- [API principles](#api-principles)
+- [Mathematical reading guides](#mathematical-reading-guides)
+- [Verification and limits](#verification-and-limits)
+- [License](#license)
+
 The central idea is simple:
 
 ```text
@@ -18,19 +31,17 @@ The package is a learning implementation, not a replacement for a proof
 assistant or a complete implementation of every infinite construction in the
 book.
 
-## What the library provides
+## What this library provides
 
-- equality-owned finite carriers and frozen morphisms;
-- executable categories, functors, natural transformations, diagrams,
-  cones, cocones, limits, and colimits;
-- products, coproducts, equalizers, coequalizers, pullbacks, pushouts, and
-  relations with witness-preserving span composition;
-- comma, slice, indexed, graph, labelled-graph, rewriting, algebra,
-  adjunction, closed, and finite-topos constructions;
-- a dense-ID, union-find first-order unification solver derived from
-  coequalizers;
-- generalized closure-based theory presentations with abstract logic
-  backends.
+| Mathematical subject | Executable capability |
+| --- | --- |
+| Finite sets and arrows | Equality-owned carriers and frozen morphisms |
+| Categories and universals | Checked composition, products, quotients, limits, and colimits |
+| Relations and graphs | Witness-preserving spans, incidence maps, and rewriting |
+| Adjunctions and algebras | Units, counits, algebra squares, and bounded free constructions |
+| Toposes | Finite exponentials, classifiers, quantifiers, and graph-topos examples |
+| Unification | Dense-ID, union-find first-order solver derived from coequalizers |
+| Specifications | Generalized closure-based presentations with abstract logic backends |
 
 The implementation makes premises visible. Constructing a category record does
 not prove its laws; constructing a universal record does not invent a missing
@@ -46,8 +57,8 @@ dune runtest --cache=disabled --no-config --force
 ```
 
 The declared minimums are OCaml 4.14 and Dune 3.7. Verification has been run
-with OCaml 5.2.1 and Dune 3.24.2. The commands build the local library and test
-executables; they do not install or publish a package.
+with OCaml 5.2.1 and Dune 3.24.2. These commands build and test the package;
+they do not install or publish it.
 
 ## First API example: finite carriers and morphisms
 
@@ -160,8 +171,8 @@ explicitly enumerated closure.
 - [Categorical unification](docs/chapter8.md)
 - [Generalized theory presentations](docs/chapter9.md)
 
-Each guide follows the same path: definition, reduction to pseudocode,
-representation contract, executable owner, evidence, and limits.
+Each guide starts with the mathematical definition, derives a representation,
+then explains the API, evidence, and limits.
 
 ## Verification and limits
 
@@ -176,3 +187,7 @@ category laws, termination of arbitrary callbacks, semantic closure for every
 institution, infinite natural-transformation equality, or general infinite
 universal constructions. Chapter 10 is intentionally not implemented here; it
 is an extended investigation of category implementations in other languages.
+
+## License
+
+This project is distributed under the [MIT License](LICENSE).

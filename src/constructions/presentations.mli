@@ -1,7 +1,8 @@
-(* Generalized theory presentations.  Logic, sentence transport and closure
-   are supplied by a backend; this layer does not assume equations, models, or
-   finite sentence sets. *)
+(** Generalized theory presentations. Logic, sentence transport, and closure
+    are supplied by a backend; this layer does not assume equations, models, or
+    finite sentence sets. *)
 module type LOGIC = sig
+  (** The abstract logic capability used by presentations. *)
   type signature
   type signature_arrow
   type sentence
@@ -43,12 +44,15 @@ module type LOGIC = sig
 end
 
 module Make (L : LOGIC) : sig
+  (** Presentations and arrows admitted under [L]'s transport and entailment. *)
   type presentation
   type theory_arrow
 
+  (** Build a presentation without eagerly closing its constraints. *)
   val presentation : L.signature -> L.constraint_expr -> presentation
   val signature : presentation -> L.signature
   val constraints : presentation -> L.constraint_expr
+  (* Apply the backend closure operation at an explicit boundary. *)
   val close : presentation ->
     (presentation, Foundations.Category.error) result
 
@@ -58,11 +62,13 @@ module Make (L : LOGIC) : sig
   val arrow_target : theory_arrow -> presentation
   val arrow_map : theory_arrow -> L.signature_arrow
 
+  (** Form a tagged signature coproduct and transport both constraint sets. *)
   val combine : presentation -> presentation ->
     (presentation, Foundations.Category.error) result
   val enrich : presentation ->
     extension:L.signature_arrow -> additions:L.constraint_expr ->
     (presentation, Foundations.Category.error) result
+  (* Apply a parameter through a signature pushout. *)
   val parameter_apply :
     requirement:presentation -> parameter:presentation ->
     requirement_map:L.signature_arrow -> parameter_map:L.signature_arrow ->

@@ -1,7 +1,8 @@
 open Foundations.Category
 open Diagrams
-(* Primitive universal capability contracts. Semantic failures use Foundations.Category.error;
-   supplied categories and capabilities remain lawful caller premises. *)
+(* Primitive universal capability contracts. Semantic failures use
+   [Foundations.Category.error]; supplied categories and capabilities remain
+   lawful caller premises. *)
 type ('o, 'a) initial_obj = {
   init_obj : 'o;
   init_univ : 'o -> ('a, Foundations.Category.error) result;
@@ -10,6 +11,7 @@ type ('o, 'a) terminal_obj = {
   term_obj : 'o;
   term_univ : 'o -> ('a, Foundations.Category.error) result;
 }
+(* A chosen coproduct object and its two injections. *)
 type ('o, 'a) coproduct_data = {
   coprod_obj : 'o; coprod_inj1 : 'a; coprod_inj2 : 'a;
 }
@@ -17,6 +19,7 @@ type ('o, 'a) coproduct =
   'o * 'o ->
   (('o, 'a) coproduct_data *
    ('o -> 'a -> 'a -> ('a, Foundations.Category.error) result), Foundations.Category.error) result
+(* A chosen product object and its two projections. *)
 type ('o, 'a) product_data = {
   prod_obj : 'o; prod_proj1 : 'a; prod_proj2 : 'a;
 }
@@ -24,6 +27,7 @@ type ('o, 'a) product =
   'o * 'o ->
   (('o, 'a) product_data *
    ('o -> 'a -> 'a -> ('a, Foundations.Category.error) result), Foundations.Category.error) result
+(* A chosen coequalizer object and quotient arrow. *)
 type ('o, 'a) coequalizer_data = { coeq_obj : 'o; coeq_arrow : 'a }
 type ('o, 'a) coequalizer =
   'a * 'a ->
@@ -34,6 +38,7 @@ type ('o, 'a) equalizer =
   'a * 'a ->
   (('o, 'a) equalizer_data *
    ('o -> 'a -> ('a, Foundations.Category.error) result), Foundations.Category.error) result
+(* A chosen pushout object and its two legs. *)
 type ('o, 'a) pushout_data = {
   pushout_obj : 'o; pushout_leg1 : 'a; pushout_leg2 : 'a;
 }

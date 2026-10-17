@@ -1,12 +1,13 @@
-(* F:B->A is left adjoint to G:A->B. Constructors package lawful, stable
-   capabilities, not global proofs. Universal uniqueness, functor/naturality
-   laws and coherent dictionaries remain premises. Operations check selected
-   endpoints and factor triangles; errors/exceptions propagate unchanged. *)
+(* [F : B -> A] is left adjoint to [G : A -> B]. Constructors package
+   stable capabilities rather than global proofs. Universal uniqueness,
+   naturality, and coherent dictionaries remain premises. *)
+(** A chosen free object, its unit, and the universal factor operation. *)
 type ('oa,'aa,'ab) universal_arrow = {
   free_object : 'oa;
   unit_arrow : 'ab;
   factor : 'oa -> 'ab -> ('aa,Foundations.Category.error) result;
 }
+(* An adjunction with checked selected unit, counit, and factor equations. *)
 type ('ob,'ab,'oa,'aa) adjunction
 val left : ('b,'bb,'a,'aa) adjunction -> ('b,'bb,'a,'aa) Foundations.Functor.cat_functor
 val right : ('b,'bb,'a,'aa) adjunction -> ('a,'aa,'b,'bb) Foundations.Functor.cat_functor
