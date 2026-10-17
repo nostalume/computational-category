@@ -55,6 +55,5 @@ coverage/
 *.gcno
 *.gcda
 
-# Architecture planning cache
-.agents/cache/
-.agents/plan/.cache/
+# Local agent state and planning artifacts are not project source.
+.agents/*
